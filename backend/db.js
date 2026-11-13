@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const crypto = require('crypto');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
@@ -7,7 +8,25 @@ const connectionString = process.env.NEON_DB_URL || process.env.DATABASE_URL;
 let pool = null;
 let useMockFallback = false;
 
-// Fallback in-memory data store for local dev testing if Neon DB URL is not yet connected
+/**
+ * Computes a time-based dynamic join code for a project room.
+ * Rotates automatically every 5 minutes (300 seconds) for high security.
+ */
+function getDynamicRoomCode(projectId, seed = 'GF-SECURE') {
+  const windowTime = Math.floor(Date.now() / 300000); // 5-minute window
+  const hash = crypto.createHash('sha256').update(`${projectId}-${seed}-${windowTime}`).digest('hex');
+  const code = hash.substring(0, 6).toUpperCase();
+  const timeRemainingSeconds = 300 - (Math.floor(Date.now() / 1000) % 300);
+
+  // Previous window code (30s grace period)
+  const prevWindowTime = windowTime - 1;
+  const prevHash = crypto.createHash('sha256').update(`${projectId}-${seed}-${prevWindowTime}`).digest('hex');
+  const prevCode = prevHash.substring(0, 6).toUpperCase();
+
+  return { code, prevCode, timeRemainingSeconds, windowTime };
+}
+
+// Resilient in-memory data store for local dev
 const mockStore = {
   users: [
     {
@@ -16,7 +35,9 @@ const mockStore = {
       username: 'edwin-esquivel',
       name: 'Edwin Esquivel',
       avatar_url: 'https://avatars.githubusercontent.com/u/10101?v=4',
-      email: 'edwin@example.com',
+      custom_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+      email: 'edwin@omnicode.tech',
+      bio: 'Lead Full-Stack Developer & DevOps en GitFlow',
       created_at: new Date('2026-11-01T10:00:00Z')
     },
     {
@@ -25,7 +46,9 @@ const mockStore = {
       username: 'maria-dev',
       name: 'Maria Gomez',
       avatar_url: 'https://avatars.githubusercontent.com/u/20202?v=4',
-      email: 'maria.gomez@example.com',
+      custom_avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80',
+      email: 'maria.gomez@omnicode.tech',
+      bio: 'Backend & Telemetry Engineer',
       created_at: new Date('2026-11-02T11:00:00Z')
     },
     {
@@ -34,7 +57,9 @@ const mockStore = {
       username: 'alex-coder',
       name: 'Alex Rivera',
       avatar_url: 'https://avatars.githubusercontent.com/u/30303?v=4',
-      email: 'alex.rivera@example.com',
+      custom_avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80',
+      email: 'alex.rivera@omnicode.tech',
+      bio: 'Frontend & UX Specialist',
       created_at: new Date('2026-11-03T12:00:00Z')
     }
   ],
@@ -42,13 +67,32 @@ const mockStore = {
     {
       id: 1,
       name: 'GitFlow Ecosystem',
-      description: 'Plataforma de gestión ágil y telemetría de código en tiempo real conectada a GitHub.',
+      description: 'Sala principal del ecosistema ágil y telemetría de código en tiempo real.',
       github_repo: 'edwin-esquivel-ADSO/GitFlow',
-      context_markdown: `# GitFlow: Especificaciones del Ecosistema\n\n## 🎯 Objetivo\nUnificar el flujo de trabajo ágil con la telemetría de commits en tiempo real directamente desde GitHub.\n\n## 🛠️ Pila Tecnológica\n- **Frontend**: React 18, Vite, Tailwind CSS, Socket.io-client.\n- **Backend**: Node.js, Express, Socket.io, pg (Neon DB).\n- **Telemetría**: Webhooks sincronizados con RegEx #ID para auto-vincular commits a tareas.\n\n## 📌 Reglas de Integración\n1. Todo commit debe referenciar una tarea: feat: login integrado #1\n2. Al escribir fixes #ID o closes #ID, la tarea pasa a DONE.\n3. El editor colaborativo sincroniza en vivo con WebSockets.`,
+      context_markdown: `# GitFlow: Especificaciones del Ecosistema\n\n## 🎯 Objetivo\nUnificar el flujo de trabajo ágil con la telemetría de commits en tiempo real directamente desde GitHub.\n\n## 🛠️ Pila Tecnológica\n- **Frontend**: React 18, Vite, Tailwind CSS, Socket.io-client.\n- **Backend**: Node.js, Express, Socket.io, pg (Neon DB).\n- **Seguridad**: Salas dinámicas con código de acceso temporal de 5 minutos.`,
       owner_id: 1,
+      room_seed: 'GF-PROD-2026',
       created_at: new Date('2026-11-01T10:00:00Z'),
       updated_at: new Date()
+    },
+    {
+      id: 2,
+      name: 'Backend Microservices',
+      description: 'Sala de infraestructura, microservicios y arquitectura de base de datos.',
+      github_repo: 'edwin-esquivel-ADSO/GitFlow-Backend',
+      context_markdown: `# Documentación de Microservicios Backend\n\nDirectrices de APIs y webhooks.`,
+      owner_id: 1,
+      room_seed: 'GF-BACKEND-ROOM',
+      created_at: new Date('2026-11-05T10:00:00Z'),
+      updated_at: new Date()
     }
+  ],
+  project_members: [
+    { id: 1, project_id: 1, user_id: 1, role: 'OWNER', joined_at: new Date() },
+    { id: 2, project_id: 1, user_id: 2, role: 'MEMBER', joined_at: new Date() },
+    { id: 3, project_id: 1, user_id: 3, role: 'MEMBER', joined_at: new Date() },
+    { id: 4, project_id: 2, user_id: 1, role: 'OWNER', joined_at: new Date() },
+    { id: 5, project_id: 2, user_id: 2, role: 'ADMIN', joined_at: new Date() }
   ],
   tasks: [
     {
@@ -59,6 +103,9 @@ const mockStore = {
       status: 'DONE',
       priority: 'HIGH',
       assigned_to_user_id: 1,
+      created_by_user_id: 1,
+      is_archived: true,
+      completed_at: new Date(Date.now() - 2 * 86400000),
       created_at: new Date('2026-11-01T10:00:00Z'),
       updated_at: new Date('2026-11-02T15:00:00Z')
     },
@@ -70,6 +117,9 @@ const mockStore = {
       status: 'DONE',
       priority: 'URGENT',
       assigned_to_user_id: 2,
+      created_by_user_id: 1,
+      is_archived: true,
+      completed_at: new Date(Date.now() - 1 * 86400000),
       created_at: new Date('2026-11-01T11:00:00Z'),
       updated_at: new Date('2026-11-02T16:00:00Z')
     },
@@ -81,6 +131,9 @@ const mockStore = {
       status: 'IN_PROGRESS',
       priority: 'HIGH',
       assigned_to_user_id: 1,
+      created_by_user_id: 1,
+      is_archived: false,
+      completed_at: null,
       created_at: new Date('2026-11-02T09:00:00Z'),
       updated_at: new Date()
     },
@@ -92,6 +145,9 @@ const mockStore = {
       status: 'IN_PROGRESS',
       priority: 'MEDIUM',
       assigned_to_user_id: 3,
+      created_by_user_id: 1,
+      is_archived: false,
+      completed_at: null,
       created_at: new Date('2026-11-02T10:00:00Z'),
       updated_at: new Date()
     },
@@ -100,21 +156,55 @@ const mockStore = {
       project_id: 1,
       title: 'Implementar filtros y búsqueda en el Kanban',
       description: 'Permitir filtrar tareas por desarrollador asignado, estado y prioridad.',
-      status: 'TODO',
+      status: 'REVIEW',
       priority: 'LOW',
       assigned_to_user_id: 2,
+      created_by_user_id: 1,
+      is_archived: false,
+      completed_at: null,
       created_at: new Date('2026-11-03T10:00:00Z'),
       updated_at: new Date()
     },
     {
       id: 6,
       project_id: 1,
-      title: 'Despliegue y configuración de producción en Vercel',
-      description: 'Ajustar vercel.json para ruteo monorepo y variables de entorno.',
+      title: 'Salas dinámicas con código de 5 minutos',
+      description: 'Generación de código temporal OTP que rota cada 5 minutos por seguridad.',
       status: 'TODO',
       priority: 'URGENT',
       assigned_to_user_id: 1,
+      created_by_user_id: 1,
+      is_archived: false,
+      completed_at: null,
       created_at: new Date('2026-11-03T11:00:00Z'),
+      updated_at: new Date()
+    },
+    {
+      id: 7,
+      project_id: 1,
+      title: 'Soporte para cambio de tema Claro y Oscuro',
+      description: 'Alternador de tema con persistencia local y soporte para móvil.',
+      status: 'DONE',
+      priority: 'MEDIUM',
+      assigned_to_user_id: 1,
+      created_by_user_id: 1,
+      is_archived: true,
+      completed_at: new Date(Date.now() - 3 * 3600000),
+      created_at: new Date('2026-11-03T12:00:00Z'),
+      updated_at: new Date()
+    },
+    {
+      id: 8,
+      project_id: 1,
+      title: 'Repositorio de Documentos estilo carpetas',
+      description: 'Organización de archivos .md, .pdf, .docx e imágenes por categorías.',
+      status: 'TODO',
+      priority: 'HIGH',
+      assigned_to_user_id: 3,
+      created_by_user_id: 1,
+      is_archived: false,
+      completed_at: null,
+      created_at: new Date('2026-11-03T13:00:00Z'),
       updated_at: new Date()
     }
   ],
@@ -185,10 +275,66 @@ const mockStore = {
       url: 'https://github.com/edwin-esquivel-ADSO/GitFlow/commit/3d4e5f6',
       timestamp: new Date(Date.now() - 15 * 60000)
     }
+  ],
+  project_documents: [
+    {
+      id: 1,
+      project_id: 1,
+      folder_name: 'Arquitectura',
+      title: 'Diagrama de Flujo y Entidades v2.0',
+      file_type: 'md',
+      file_url: '',
+      content_markdown: '# Arquitectura del Sistema\n\nEspecificaciones de microservicios y protocolos de WebSockets.',
+      created_by_user_id: 1,
+      created_at: new Date('2026-11-01T10:00:00Z')
+    },
+    {
+      id: 2,
+      project_id: 1,
+      folder_name: 'Arquitectura',
+      title: 'Manual de Despliegue en Vercel',
+      file_type: 'pdf',
+      file_url: 'https://assets.gitflow.dev/docs/vercel-deployment-guide.pdf',
+      content_markdown: '',
+      created_by_user_id: 1,
+      created_at: new Date('2026-11-02T10:00:00Z')
+    },
+    {
+      id: 3,
+      project_id: 1,
+      folder_name: 'Diseño & UX',
+      title: 'Mockups de Interfaz Móvil y Desktop',
+      file_type: 'img',
+      file_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+      content_markdown: '',
+      created_by_user_id: 3,
+      created_at: new Date('2026-11-03T10:00:00Z')
+    },
+    {
+      id: 4,
+      project_id: 1,
+      folder_name: 'Diseño & UX',
+      title: 'Guía de Estilo y Paleta de Colores',
+      file_type: 'docx',
+      file_url: 'https://assets.gitflow.dev/docs/brand-guidelines.docx',
+      content_markdown: '',
+      created_by_user_id: 3,
+      created_at: new Date('2026-11-03T11:00:00Z')
+    },
+    {
+      id: 5,
+      project_id: 1,
+      folder_name: 'Reuniones & Notas',
+      title: 'Minuta de Kickoff y Roles OMNICODE',
+      file_type: 'md',
+      file_url: '',
+      content_markdown: '# Minuta de Kickoff\n\nDefinición de roles y responsabilidades.',
+      created_by_user_id: 2,
+      created_at: new Date('2026-11-04T10:00:00Z')
+    }
   ]
 };
 
-// Check if Neon DB connection string is valid or placeholder
 const isValidConnectionString = connectionString &&
   !connectionString.includes('npg_sample_password') &&
   !connectionString.includes('password@ep-sample-pooler');
@@ -197,9 +343,7 @@ if (isValidConnectionString) {
   try {
     pool = new Pool({
       connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      },
+      ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000
@@ -209,7 +353,7 @@ if (isValidConnectionString) {
       console.error('[Neon DB Error]: Unexpected error on idle client', err.message);
     });
   } catch (err) {
-    console.warn('[Neon DB Warning]: Could not create connection pool, switching to resilient fallback store:', err.message);
+    console.warn('[Neon DB Warning]: Falling back to local in-memory store:', err.message);
     useMockFallback = true;
   }
 } else {
@@ -220,22 +364,14 @@ if (isValidConnectionString) {
 /**
  * Execute a strictly parameterized SQL query.
  * Guarantees zero SQL injection risk by enforcing prepared statements.
- * @param {string} text - The parameterized SQL query string
- * @param {Array} params - Array of parameter values ($1, $2, ...)
  */
 async function query(text, params = []) {
   if (!useMockFallback && pool) {
     try {
-      const start = Date.now();
       const res = await pool.query(text, params);
-      const duration = Date.now() - start;
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[SQL Query] Executed in ${duration}ms | Rows: ${res.rowCount}`);
-      }
       return res;
     } catch (error) {
       console.error(`[SQL Execution Error]:`, error.message, `\nQuery: ${text}`);
-      // If Neon connection breaks at runtime, fallback gracefully
       return executeMockFallback(text, params);
     }
   }
@@ -266,7 +402,20 @@ function executeMockFallback(text, params) {
     return { rows: [...mockStore.users], rowCount: mockStore.users.length };
   }
 
-  // 4. INSERT INTO users ... RETURNING *
+  // 4. UPDATE users profile (custom_avatar, name, bio)
+  if (normalized.startsWith('update users set') && normalized.includes('where id = $')) {
+    const userId = Number(params[params.length - 1]);
+    const user = mockStore.users.find(u => u.id === userId);
+    if (user) {
+      if (params[0] !== undefined) user.name = params[0] || user.name;
+      if (params[1] !== undefined) user.custom_avatar = params[1] || user.custom_avatar;
+      if (params[2] !== undefined) user.bio = params[2] || user.bio;
+      user.updated_at = new Date();
+      return { rows: [user], rowCount: 1 };
+    }
+  }
+
+  // 5. INSERT INTO users ... RETURNING *
   if (normalized.startsWith('insert into users')) {
     const newUser = {
       id: mockStore.users.length + 1,
@@ -274,7 +423,9 @@ function executeMockFallback(text, params) {
       username: params[1],
       name: params[2] || params[1],
       avatar_url: params[3] || '',
+      custom_avatar: params[3] || '',
       email: params[4] || '',
+      bio: 'Desarrollador en GitFlow',
       created_at: new Date(),
       updated_at: new Date()
     };
@@ -282,136 +433,200 @@ function executeMockFallback(text, params) {
     return { rows: [newUser], rowCount: 1 };
   }
 
-  // 5. UPDATE users ... RETURNING *
-  if (normalized.startsWith('update users')) {
-    const user = mockStore.users.find(u => String(u.github_id) === String(params[0]));
-    if (user) {
-      user.username = params[1] || user.username;
-      user.name = params[2] || user.name;
-      user.avatar_url = params[3] || user.avatar_url;
-      user.updated_at = new Date();
-      return { rows: [user], rowCount: 1 };
-    }
-  }
-
-  // 6. SELECT projects ALL
+  // 6. SELECT projects for user (or all projects)
   if (normalized.includes('from projects') && !normalized.includes('where id = $1')) {
-    return { rows: [...mockStore.projects], rowCount: mockStore.projects.length };
+    const projectsWithCounts = mockStore.projects.map(p => {
+      const taskCount = mockStore.tasks.filter(t => t.project_id === p.id && !t.is_archived).length;
+      const commitCount = mockStore.commits.filter(c => c.project_id === p.id).length;
+      const memberCount = mockStore.project_members.filter(m => m.project_id === p.id).length;
+      return {
+        ...p,
+        total_tasks: taskCount,
+        total_commits: commitCount,
+        total_members: memberCount
+      };
+    });
+    return { rows: projectsWithCounts, rowCount: projectsWithCounts.length };
   }
 
   // 7. SELECT projects WHERE id = $1
-  if (normalized.includes('from projects where id = $1')) {
+  if (normalized.includes('from projects where id = $1') || normalized.includes('from projects p') && normalized.includes('p.id = $1')) {
     const project = mockStore.projects.find(p => Number(p.id) === Number(params[0]));
-    return { rows: project ? [project] : [], rowCount: project ? 1 : 0 };
-  }
-
-  // 8. UPDATE projects SET context_markdown
-  if (normalized.startsWith('update projects set context_markdown')) {
-    const project = mockStore.projects.find(p => Number(p.id) === Number(params[1]));
     if (project) {
-      project.context_markdown = params[0];
-      project.updated_at = new Date();
-      return { rows: [project], rowCount: 1 };
+      const owner = mockStore.users.find(u => u.id === project.owner_id);
+      const members = mockStore.project_members
+        .filter(m => m.project_id === project.id)
+        .map(m => {
+          const u = mockStore.users.find(user => user.id === m.user_id);
+          return {
+            ...m,
+            username: u ? u.username : 'dev',
+            name: u ? u.name : 'Developer',
+            avatar: u ? (u.custom_avatar || u.avatar_url) : ''
+          };
+        });
+      return {
+        rows: [{
+          ...project,
+          owner_username: owner ? owner.username : 'owner',
+          owner_avatar: owner ? (owner.custom_avatar || owner.avatar_url) : '',
+          members
+        }],
+        rowCount: 1
+      };
     }
     return { rows: [], rowCount: 0 };
   }
 
-  // 9. SELECT tasks BY project_id
-  if (normalized.includes('from tasks') && normalized.includes('project_id = $1')) {
-    const tasksWithUsers = mockStore.tasks
-      .filter(t => Number(t.project_id) === Number(params[0]))
-      .map(t => {
-        const user = mockStore.users.find(u => u.id === t.assigned_to_user_id);
-        const commitsCount = mockStore.commits.filter(c => c.task_id === t.id).length;
-        return {
-          ...t,
-          assigned_username: user ? user.username : null,
-          assigned_name: user ? user.name : null,
-          assigned_avatar_url: user ? user.avatar_url : null,
-          commits_count: commitsCount
-        };
-      });
-    return { rows: tasksWithUsers, rowCount: tasksWithUsers.length };
-  }
-
-  // 10. SELECT tasks WHERE id = $1
-  if (normalized.includes('from tasks where id = $1')) {
-    const task = mockStore.tasks.find(t => Number(t.id) === Number(params[0]));
-    return { rows: task ? [task] : [], rowCount: task ? 1 : 0 };
-  }
-
-  // 11. INSERT INTO tasks ... RETURNING *
-  if (normalized.startsWith('insert into tasks')) {
-    const newTask = {
-      id: mockStore.tasks.length + 1,
-      project_id: Number(params[0]),
-      title: params[1],
-      description: params[2] || '',
-      status: params[3] || 'TODO',
-      priority: params[4] || 'MEDIUM',
-      assigned_to_user_id: params[5] ? Number(params[5]) : null,
+  // 8. INSERT INTO projects ... RETURNING *
+  if (normalized.startsWith('insert into projects')) {
+    const newProj = {
+      id: mockStore.projects.length + 1,
+      name: params[0],
+      description: params[1] || '',
+      github_repo: params[2] || 'edwin-esquivel-ADSO/GitFlow',
+      context_markdown: params[3] || '# Contexto de la Sala\n\nEspecificaciones.',
+      owner_id: Number(params[4]),
+      room_seed: 'GF-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
       created_at: new Date(),
       updated_at: new Date()
     };
-    mockStore.tasks.push(newTask);
-    return { rows: [newTask], rowCount: 1 };
+    mockStore.projects.push(newProj);
+    // Add owner as member
+    mockStore.project_members.push({
+      id: mockStore.project_members.length + 1,
+      project_id: newProj.id,
+      user_id: newProj.owner_id,
+      role: 'OWNER',
+      joined_at: new Date()
+    });
+    return { rows: [newProj], rowCount: 1 };
+  }
+
+  // 9. INSERT INTO project_members
+  if (normalized.startsWith('insert into project_members')) {
+    const projectId = Number(params[0]);
+    const userId = Number(params[1]);
+    const role = params[2] || 'MEMBER';
+    const exists = mockStore.project_members.find(m => m.project_id === projectId && m.user_id === userId);
+    if (!exists) {
+      const member = {
+        id: mockStore.project_members.length + 1,
+        project_id: projectId,
+        user_id: userId,
+        role,
+        joined_at: new Date()
+      };
+      mockStore.project_members.push(member);
+      return { rows: [member], rowCount: 1 };
+    }
+    return { rows: [exists], rowCount: 1 };
+  }
+
+  // 10. SELECT tasks BY project_id (with privacy check)
+  if (normalized.includes('from tasks') && normalized.includes('project_id = $1')) {
+    const projectId = Number(params[0]);
+    const userId = params[1] ? Number(params[1]) : null;
+    const project = mockStore.projects.find(p => p.id === projectId);
+    const isOwner = project && userId && project.owner_id === userId;
+
+    let filtered = mockStore.tasks.filter(t => t.project_id === projectId && !t.is_archived);
+
+    // If regular member, filter to only their tasks!
+    if (!isOwner && userId) {
+      filtered = filtered.filter(t => t.assigned_to_user_id === userId || t.created_by_user_id === userId);
+    }
+
+    const tasksWithDetails = filtered.map(t => {
+      const user = mockStore.users.find(u => u.id === t.assigned_to_user_id);
+      const commitsCount = mockStore.commits.filter(c => c.task_id === t.id).length;
+      return {
+        ...t,
+        assigned_username: user ? user.username : null,
+        assigned_name: user ? user.name : null,
+        assigned_avatar_url: user ? (user.custom_avatar || user.avatar_url) : null,
+        commits_count: commitsCount
+      };
+    });
+    return { rows: tasksWithDetails, rowCount: tasksWithDetails.length };
+  }
+
+  // 11. SELECT tasks HISTORY (completed tasks)
+  if (normalized.includes('from tasks') && (normalized.includes('is_archived = true') || normalized.includes("status = 'done'"))) {
+    const projectId = Number(params[0]);
+    const userId = params[1] ? Number(params[1]) : null;
+    const project = mockStore.projects.find(p => p.id === projectId);
+    const isOwner = project && userId && project.owner_id === userId;
+
+    let filtered = mockStore.tasks.filter(t => t.project_id === projectId && (t.status === 'DONE' || t.is_archived));
+    if (!isOwner && userId) {
+      filtered = filtered.filter(t => t.assigned_to_user_id === userId);
+    }
+
+    const result = filtered.map(t => {
+      const user = mockStore.users.find(u => u.id === t.assigned_to_user_id);
+      return {
+        ...t,
+        assigned_username: user ? user.username : null,
+        assigned_name: user ? user.name : null,
+        assigned_avatar_url: user ? (user.custom_avatar || user.avatar_url) : null
+      };
+    });
+    return { rows: result, rowCount: result.length };
   }
 
   // 12. UPDATE tasks SET status
   if (normalized.startsWith('update tasks set status')) {
-    const task = mockStore.tasks.find(t => Number(t.id) === Number(params[1]));
+    const taskId = Number(params[1]);
+    const nextStatus = params[0];
+    const task = mockStore.tasks.find(t => t.id === taskId);
     if (task) {
-      task.status = params[0];
+      task.status = nextStatus;
+      if (nextStatus === 'DONE') {
+        task.completed_at = new Date();
+        task.is_archived = true;
+      } else {
+        task.is_archived = false;
+        task.completed_at = null;
+      }
       task.updated_at = new Date();
       return { rows: [task], rowCount: 1 };
     }
     return { rows: [], rowCount: 0 };
   }
 
-  // 13. SELECT commits BY project_id OR task_id
+  // 13. DOCUMENTS (project_documents)
+  if (normalized.includes('from project_documents where project_id = $1')) {
+    const projectId = Number(params[0]);
+    const docs = mockStore.project_documents.filter(d => d.project_id === projectId);
+    return { rows: docs, rowCount: docs.length };
+  }
+
+  if (normalized.startsWith('insert into project_documents')) {
+    const newDoc = {
+      id: mockStore.project_documents.length + 1,
+      project_id: Number(params[0]),
+      folder_name: params[1] || 'General',
+      title: params[2],
+      file_type: params[3] || 'md',
+      file_url: params[4] || '',
+      content_markdown: params[5] || '',
+      created_by_user_id: params[6] ? Number(params[6]) : 1,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    mockStore.project_documents.push(newDoc);
+    return { rows: [newDoc], rowCount: 1 };
+  }
+
+  // 14. COMMITS
   if (normalized.includes('from commits')) {
     let list = [...mockStore.commits];
     if (normalized.includes('project_id = $1') && params[0]) {
       list = list.filter(c => Number(c.project_id) === Number(params[0]));
     }
-    // Sort descending by timestamp
     list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     return { rows: list, rowCount: list.length };
-  }
-
-  // 14. INSERT INTO commits ... RETURNING *
-  if (normalized.startsWith('insert into commits')) {
-    const newCommit = {
-      id: mockStore.commits.length + 1,
-      project_id: params[0] ? Number(params[0]) : 1,
-      task_id: params[1] ? Number(params[1]) : null,
-      user_id: params[2] ? Number(params[2]) : null,
-      hash: params[3],
-      message: params[4],
-      author_name: params[5],
-      url: params[6] || '',
-      timestamp: new Date()
-    };
-    mockStore.commits.unshift(newCommit);
-    return { rows: [newCommit], rowCount: 1 };
-  }
-
-  // 15. Dashboard Stats Aggregate
-  if (normalized.includes('count(distinct c.id)') || normalized.includes('dashboard')) {
-    const totalTasks = mockStore.tasks.length;
-    const closedTasks = mockStore.tasks.filter(t => t.status === 'DONE').length;
-    const inProgressTasks = mockStore.tasks.filter(t => t.status === 'IN_PROGRESS').length;
-    const totalCommits = mockStore.commits.length;
-
-    return {
-      rows: [{
-        total_tasks: totalTasks,
-        closed_tasks: closedTasks,
-        in_progress_tasks: inProgressTasks,
-        total_commits: totalCommits
-      }],
-      rowCount: 1
-    };
   }
 
   return { rows: [], rowCount: 0 };
@@ -420,5 +635,6 @@ function executeMockFallback(text, params) {
 module.exports = {
   query,
   pool,
+  getDynamicRoomCode,
   getMockStore: () => mockStore
 };

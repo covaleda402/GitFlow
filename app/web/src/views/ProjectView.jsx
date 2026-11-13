@@ -1,19 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
-import Navbar from '../components/Navbar';
+import Sidebar from '../components/Sidebar';
+import MobileBottomNav from '../components/MobileBottomNav';
+import MobileTopBar from '../components/MobileTopBar';
 import KanbanBoard from '../components/KanbanBoard';
+import ProjectDocuments from '../components/ProjectDocuments';
 import LiveContextEditor from '../components/LiveContextEditor';
+import TaskHistory from '../components/TaskHistory';
 import ActivityFeed from '../components/ActivityFeed';
 import ContributionDashboard from '../components/ContributionDashboard';
+import CreateRoomModal from '../components/CreateRoomModal';
+import JoinRoomModal from '../components/JoinRoomModal';
 import { 
   Layers, 
   FileText, 
   Radio, 
+  Archive, 
   BarChart3, 
   GitBranch, 
   ExternalLink,
-  Users
+  Users,
+  KeyRound,
+  Edit3
 } from 'lucide-react';
 
 export default function ProjectView() {
@@ -21,8 +30,16 @@ export default function ProjectView() {
   const projectId = parseInt(id, 10) || 1;
   const { joinProject, onlineUsers } = useSocket();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'kanban');
+  const activeTab = searchParams.get('tab') || 'kanban';
   const [project, setProject] = useState(null);
+
+  // Modals state
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [simulateModalOpen, setSimulateModalOpen] = useState(false);
+
+  // Live context editor sub-tab in documents
+  const [docSubTab, setDocSubTab] = useState('repository'); // 'repository' | 'live-editor'
 
   // Join the project room on mount
   useEffect(() => {
@@ -45,57 +62,91 @@ export default function ProjectView() {
     fetchProject();
   }, [projectId]);
 
-  // Sync tab with search parameters
   const handleTabChange = (tab) => {
-    setActiveTab(tab);
     setSearchParams({ tab });
   };
 
+  const handleSimulatePush = async () => {
+    try {
+      await fetch('/api/webhook/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'feat: avance en sala activa #3',
+          author: 'edwin-esquivel',
+          taskId: 3
+        })
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const tabs = [
-    { id: 'kanban', label: 'Tablero Ágil', icon: Layers, count: null },
-    { id: 'context', label: 'Contexto en Vivo', icon: FileText, count: 'Live' },
-    { id: 'activity', label: 'Telemetría de Commits', icon: Radio, count: null },
-    { id: 'metrics', label: 'Métricas de Aportes', icon: BarChart3, count: null }
+    { id: 'kanban', label: 'Tablero Ágil', icon: Layers },
+    { id: 'documents', label: 'Documentos & Contexto', icon: FileText },
+    { id: 'history', label: 'Historial Terminado', icon: Archive },
+    { id: 'telemetry', label: 'Telemetría Commits', icon: Radio },
+    { id: 'analytics', label: 'Analítica de Sala', icon: BarChart3 }
   ];
 
   return (
-    <div className="min-h-screen bg-dark-950 flex flex-col">
-      <Navbar />
+    <div className="min-h-screen bg-slate-50 dark:bg-dark-950 flex flex-col md:flex-row transition-colors">
+      
+      {/* 1. Desktop Left Sidebar */}
+      <Sidebar 
+        projectId={projectId}
+        onOpenCreateRoom={() => setIsCreateOpen(true)}
+        onOpenJoinRoom={() => setIsJoinOpen(true)}
+        onSimulatePush={handleSimulatePush}
+      />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
+      {/* 2. Mobile Top Bar */}
+      <MobileTopBar 
+        projectName={project ? project.name : 'GitFlow'}
+        onOpenRoomsModal={() => setIsCreateOpen(true)}
+        onOpenJoinModal={() => setIsJoinOpen(true)}
+      />
+
+      {/* 3. Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 pb-24 md:pb-8 overflow-y-auto">
         
-        {/* Project Breadcrumb & Subheader */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        {/* Project Header Banner */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-400 mb-1">
-              <span>Proyectos</span>
+            <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 mb-1">
+              <span>Salas</span>
               <span>/</span>
               <span className="text-brand-cyan">{project ? project.name : 'GitFlow Ecosystem'}</span>
+              <span>•</span>
+              <span className="text-[10px] bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded-full font-bold">
+                {project?.members?.length || 1} Miembros
+              </span>
             </div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
               {project ? project.name : 'GitFlow Ecosystem'}
               <a
                 href={`https://github.com/${project ? project.github_repo : 'edwin-esquivel-ADSO/GitFlow'}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-normal text-slate-400 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-dark-900 border border-slate-700"
+                className="text-xs font-normal text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-dark-900 border border-slate-200 dark:border-slate-700"
               >
                 <GitBranch className="w-3.5 h-3.5 text-brand-cyan" />
                 <span>{project ? project.github_repo : 'edwin-esquivel-ADSO/GitFlow'}</span>
-                <ExternalLink className="w-3 h-3 text-slate-500" />
+                <ExternalLink className="w-3 h-3 text-slate-400" />
               </a>
             </h1>
           </div>
 
-          {/* Active Collaborators Pill */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-card text-xs font-mono text-slate-300">
+          {/* Connected Collaborators Pill */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-card text-xs font-mono text-slate-700 dark:text-slate-300 self-start sm:self-auto">
             <Users className="w-4 h-4 text-brand-cyan" />
-            <span>Colaboradores en sala:</span>
+            <span>En línea en esta sala:</span>
             <span className="font-bold text-brand-cyan">{onlineUsers.length || 1}</span>
           </div>
         </div>
 
-        {/* Tab Navigation Navigation Bar */}
+        {/* Tab Switcher Bar */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -104,33 +155,100 @@ export default function ProjectView() {
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all ${
                   isActive
-                    ? 'bg-slate-800 text-brand-cyan border border-brand-cyan/40 shadow-lg shadow-brand-cyan/5'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-transparent'
+                    ? 'bg-slate-900 text-white dark:bg-slate-800 dark:text-brand-cyan border border-brand-cyan/40 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-900/60'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>
-                {tab.count && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-brand-cyan/20 text-brand-cyan">
-                    {tab.count}
-                  </span>
-                )}
               </button>
             );
           })}
         </div>
 
-        {/* Tab Content Rendering */}
-        <div className="mt-4">
-          {activeTab === 'kanban' && <KanbanBoard projectId={projectId} />}
-          {activeTab === 'context' && <LiveContextEditor projectId={projectId} />}
-          {activeTab === 'activity' && <ActivityFeed projectId={projectId} />}
-          {activeTab === 'metrics' && <ContributionDashboard projectId={projectId} />}
+        {/* Tab Body */}
+        <div className="mt-2">
+          {activeTab === 'kanban' && (
+            <KanbanBoard 
+              projectId={projectId} 
+              onSwitchToHistory={() => handleTabChange('history')} 
+            />
+          )}
+
+          {activeTab === 'documents' && (
+            <div className="space-y-6">
+              {/* Sub-tab: Document Repository vs Live Markdown Notion Editor */}
+              <div className="flex items-center gap-2 p-1 bg-slate-200/80 dark:bg-dark-900 rounded-xl w-fit text-xs font-mono">
+                <button
+                  onClick={() => setDocSubTab('repository')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    docSubTab === 'repository' 
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold shadow-sm' 
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  📁 Repositorio de Archivos (.md, .pdf, .docx, img)
+                </button>
+                <button
+                  onClick={() => setDocSubTab('live-editor')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    docSubTab === 'live-editor' 
+                      ? 'bg-white dark:bg-slate-800 text-brand-cyan font-bold shadow-sm' 
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  ⚡ Editor Colaborativo en Vivo
+                </button>
+              </div>
+
+              {docSubTab === 'repository' ? (
+                <ProjectDocuments projectId={projectId} />
+              ) : (
+                <LiveContextEditor projectId={projectId} />
+              )}
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <TaskHistory projectId={projectId} />
+          )}
+
+          {activeTab === 'telemetry' && (
+            <ActivityFeed projectId={projectId} />
+          )}
+
+          {activeTab === 'analytics' && (
+            <ContributionDashboard projectId={projectId} />
+          )}
         </div>
 
       </main>
+
+      {/* 4. Mobile Bottom Navigation (TikTok style) */}
+      <MobileBottomNav 
+        projectId={projectId} 
+        onSimulatePush={handleSimulatePush} 
+      />
+
+      {/* Modals for Room Creation and Joining */}
+      <CreateRoomModal 
+        isOpen={isCreateOpen} 
+        onClose={() => setIsCreateOpen(false)} 
+        onCreated={(newRoom) => {
+          window.location.href = `/projects/${newRoom.id}`;
+        }} 
+      />
+
+      <JoinRoomModal 
+        isOpen={isJoinOpen} 
+        onClose={() => setIsJoinOpen(false)} 
+        onJoined={(joinedId) => {
+          window.location.href = `/projects/${joinedId}`;
+        }} 
+      />
+
     </div>
   );
 }
