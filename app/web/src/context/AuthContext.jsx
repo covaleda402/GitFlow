@@ -20,7 +20,6 @@ export function AuthProvider({ children }) {
         localStorage.setItem('gitflow_token', urlToken);
         setToken(urlToken);
         activeToken = urlToken;
-        // Clean up URL parameter cleanly without page reload
         window.history.replaceState({}, document.title, window.location.pathname);
       }
 
@@ -41,7 +40,6 @@ export function AuthProvider({ children }) {
           const data = await response.json();
           setUser(data.user);
         } else {
-          // Token expired or invalid
           console.warn('[Auth] Session expired or invalid token');
           localStorage.removeItem('gitflow_token');
           setToken(null);
@@ -93,6 +91,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('gitflow_token');
     setToken(null);
     setUser(null);
+    window.location.href = '/login';
   };
 
   return (

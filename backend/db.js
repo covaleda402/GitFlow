@@ -281,10 +281,10 @@ const mockStore = {
       id: 1,
       project_id: 1,
       folder_name: 'Arquitectura',
-      title: 'Diagrama de Flujo y Entidades v2.0',
+      title: 'Diagrama de Flujo y Microservicios v2.0',
       file_type: 'md',
       file_url: '',
-      content_markdown: '# Arquitectura del Sistema\n\nEspecificaciones de microservicios y protocolos de WebSockets.',
+      content_markdown: '# Arquitectura del Ecosistema GitFlow\n\n## Servicios Principales:\n1. Ingestion de Webhooks con Regex Parser.\n2. Conexiones Socket.io con salas por proyecto.\n3. Base de Datos Neon PostgreSQL protegida con Prepared Statements.',
       created_by_user_id: 1,
       created_at: new Date('2026-11-01T10:00:00Z')
     },
@@ -292,9 +292,9 @@ const mockStore = {
       id: 2,
       project_id: 1,
       folder_name: 'Arquitectura',
-      title: 'Manual de Despliegue en Vercel',
+      title: 'Guía de Despliegue en Vercel Monorepo',
       file_type: 'pdf',
-      file_url: 'https://assets.gitflow.dev/docs/vercel-deployment-guide.pdf',
+      file_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
       content_markdown: '',
       created_by_user_id: 1,
       created_at: new Date('2026-11-02T10:00:00Z')
@@ -303,7 +303,7 @@ const mockStore = {
       id: 3,
       project_id: 1,
       folder_name: 'Diseño & UX',
-      title: 'Mockups de Interfaz Móvil y Desktop',
+      title: 'Mockup de Navegación Móvil TikTok Style',
       file_type: 'img',
       file_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
       content_markdown: '',
@@ -314,9 +314,9 @@ const mockStore = {
       id: 4,
       project_id: 1,
       folder_name: 'Diseño & UX',
-      title: 'Guía de Estilo y Paleta de Colores',
+      title: 'Especificaciones de Paleta de Colores y Contrastes',
       file_type: 'docx',
-      file_url: 'https://assets.gitflow.dev/docs/brand-guidelines.docx',
+      file_url: 'https://calibre-ebook.com/downloads/demos/demo.docx',
       content_markdown: '',
       created_by_user_id: 3,
       created_at: new Date('2026-11-03T11:00:00Z')
@@ -328,9 +328,31 @@ const mockStore = {
       title: 'Minuta de Kickoff y Roles OMNICODE',
       file_type: 'md',
       file_url: '',
-      content_markdown: '# Minuta de Kickoff\n\nDefinición de roles y responsabilidades.',
+      content_markdown: '# Minuta de Kickoff OMNICODE\n\n- **A00**: Orquestador General.\n- **A03/A05**: Product Owner y UX.\n- **A06/A10**: Arquitecto y DBA.\n- **Desarrollador Principal**: Edwin Esquivel.',
       created_by_user_id: 2,
       created_at: new Date('2026-11-04T10:00:00Z')
+    },
+    {
+      id: 6,
+      project_id: 1,
+      folder_name: 'Documentación General',
+      title: 'Manual de Vinculación de GitHub OAuth y Webhooks',
+      file_type: 'md',
+      file_url: '',
+      content_markdown: '# Guía de Vinculación GitHub\n\nConfiguración paso a paso de Client ID, Secret y endpoint receptor de commits.',
+      created_by_user_id: 1,
+      created_at: new Date('2026-11-05T09:00:00Z')
+    },
+    {
+      id: 7,
+      project_id: 1,
+      folder_name: 'Diseño & UX',
+      title: 'Wireframes de Tablero Ágil y Chatbot',
+      file_type: 'img',
+      file_url: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=1200&q=80',
+      content_markdown: '',
+      created_by_user_id: 2,
+      created_at: new Date('2026-11-05T14:00:00Z')
     }
   ]
 };

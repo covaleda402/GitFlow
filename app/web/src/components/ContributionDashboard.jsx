@@ -35,7 +35,6 @@ export default function ContributionDashboard({ projectId = 1 }) {
     fetchStats();
   }, [projectId]);
 
-  // WebSocket listeners to refresh stats in real-time
   useEffect(() => {
     if (!socket) return;
 
@@ -57,7 +56,7 @@ export default function ContributionDashboard({ projectId = 1 }) {
   if (loading || !stats) {
     return (
       <div className="w-full p-8 text-center text-xs text-slate-500 font-mono">
-        Cargando telemetría de aportes...
+        Cargando analítica de la sala...
       </div>
     );
   }
@@ -67,71 +66,67 @@ export default function ContributionDashboard({ projectId = 1 }) {
   return (
     <div className="w-full space-y-6">
       
-      {/* Top 4 KPI Metrics */}
+      {/* Top 4 KPI Metrics - High Contrast in Light & Dark Mode */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Total Commits KPI */}
-        <div className="p-5 rounded-2xl glass-panel border border-slate-800 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-brand-cyan/10 rounded-full blur-2xl group-hover:bg-brand-cyan/20 transition-all pointer-events-none" />
+        <div className="p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group shadow-sm bg-white dark:bg-dark-900/60">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono text-slate-400">COMMITS REGISTRADOS</span>
-            <div className="p-2 rounded-xl bg-brand-cyan/10 text-brand-cyan">
+            <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-400 uppercase">COMMITS REGISTRADOS</span>
+            <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-600 dark:text-brand-cyan">
               <GitCommit className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white font-mono">{totalCommits}</span>
-            <span className="text-xs text-emerald-400 font-mono">+100% verificado</span>
+            <span className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono">{totalCommits}</span>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-mono font-bold">+100% verificado</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Sincronizados vía Webhooks</p>
+          <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">Sincronizados vía Webhooks</p>
         </div>
 
         {/* Closed Tasks KPI */}
-        <div className="p-5 rounded-2xl glass-panel border border-slate-800 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all pointer-events-none" />
+        <div className="p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group shadow-sm bg-white dark:bg-dark-900/60">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono text-slate-400">TAREAS COMPLETADAS</span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+            <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-400 uppercase">TAREAS COMPLETADAS</span>
+            <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white font-mono">{taskCounts.DONE}</span>
-            <span className="text-xs text-slate-400 font-mono">de {taskCounts.total} tareas</span>
+            <span className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono">{taskCounts.DONE}</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-mono font-bold">de {taskCounts.total} tareas</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Cerradas mediante commits o kanban</p>
+          <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">Cerradas mediante commits o kanban</p>
         </div>
 
         {/* Tasks In Progress KPI */}
-        <div className="p-5 rounded-2xl glass-panel border border-slate-800 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-brand-blue/10 rounded-full blur-2xl group-hover:bg-brand-blue/20 transition-all pointer-events-none" />
+        <div className="p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group shadow-sm bg-white dark:bg-dark-900/60">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono text-slate-400">EN DESARROLLO ACTIVO</span>
-            <div className="p-2 rounded-xl bg-brand-blue/10 text-brand-blue">
+            <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-400 uppercase">EN DESARROLLO ACTIVO</span>
+            <div className="p-2 rounded-xl bg-blue-500/15 text-blue-600 dark:text-brand-blue">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white font-mono">{taskCounts.IN_PROGRESS}</span>
-            <span className="text-xs text-brand-blue font-mono">{taskCounts.TODO} por iniciar</span>
+            <span className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono">{taskCounts.IN_PROGRESS}</span>
+            <span className="text-xs text-blue-600 dark:text-brand-blue font-mono font-bold">{taskCounts.TODO} por iniciar</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Flujo ágil en curso</p>
+          <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">Flujo ágil en curso</p>
         </div>
 
-        {/* Completion Rate KPI */}
-        <div className="p-5 rounded-2xl glass-panel border border-slate-800 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-brand-violet/10 rounded-full blur-2xl group-hover:bg-brand-violet/20 transition-all pointer-events-none" />
+        {/* Velocity / Completion Rate */}
+        <div className="p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 relative overflow-hidden group shadow-sm bg-white dark:bg-dark-900/60">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono text-slate-400">VELOCIDAD DE SPRINT</span>
-            <div className="p-2 rounded-xl bg-brand-violet/10 text-brand-violet">
+            <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-400 uppercase">VELOCIDAD DE SPRINT</span>
+            <div className="p-2 rounded-xl bg-purple-500/15 text-purple-600 dark:text-brand-violet">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white font-mono">{completionRate}%</span>
-            <span className="text-xs text-brand-violet font-mono">eficiencia</span>
+            <span className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono">{completionRate}%</span>
+            <span className="text-xs text-purple-600 dark:text-brand-violet font-mono font-bold">eficiencia</span>
           </div>
-          <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+          <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full mt-2.5 overflow-hidden">
             <div 
               className="bg-gradient-to-r from-brand-cyan to-brand-violet h-full rounded-full transition-all duration-500" 
               style={{ width: `${completionRate}%` }} 
@@ -141,68 +136,64 @@ export default function ContributionDashboard({ projectId = 1 }) {
 
       </div>
 
-      {/* Contributions Leaderboard */}
-      <div className="rounded-2xl glass-panel border border-slate-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 bg-dark-900/40 flex items-center justify-between">
+      {/* Leaderboard Table - High Contrast */}
+      <div className="rounded-2xl glass-panel border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm bg-white dark:bg-dark-900/60">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-dark-900/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+            <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
               <Award className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">Impacto y Aportes del Equipo</h3>
-              <p className="text-[11px] text-slate-400">
-                Puntaje cruzado: Commits realizados (10 pts) + Tareas cerradas (25 pts)
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Impacto y Aportes del Equipo</h3>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                Fórmula de puntuación: (Commits × 10) + (Tareas Cerradas × 25)
               </p>
             </div>
           </div>
-          <span className="text-xs font-mono text-slate-400">
+          <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
             {contributors.length} desarrolladores
           </span>
         </div>
 
-        <div className="p-6">
-          <div className="space-y-4">
-            {contributors.map((member, index) => (
-              <div 
-                key={member.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-dark-900/60 border border-slate-800/80 hover:border-slate-700 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-mono font-bold text-slate-500 w-4">
-                    #{index + 1}
-                  </span>
-                  <img
-                    src={member.avatar_url || 'https://avatars.githubusercontent.com/u/10101?v=4'}
-                    alt={member.username}
-                    className="w-10 h-10 rounded-full border border-slate-700 object-cover"
-                  />
-                  <div>
-                    <h4 className="text-sm font-bold text-white">{member.name || member.username}</h4>
-                    <span className="text-xs text-slate-400 font-mono">@{member.username}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-6">
-                  {/* Commits stat */}
-                  <div className="text-left sm:text-right">
-                    <span className="text-xs text-slate-400 block font-mono">Commits</span>
-                    <span className="text-sm font-bold text-brand-cyan font-mono flex items-center gap-1 sm:justify-end">
-                      <GitCommit className="w-3.5 h-3.5" />
-                      {member.commits_count}
-                    </span>
-                  </div>
-
-                  {/* Impact score bar */}
-                  <div className="text-left sm:text-right min-w-[100px]">
-                    <span className="text-xs text-slate-400 block font-mono">Score de Impacto</span>
-                    <span className="text-base font-extrabold text-amber-400 font-mono">
-                      {member.impact_score} <span className="text-[10px] text-slate-500">pts</span>
-                    </span>
-                  </div>
+        <div className="p-4 sm:p-6 space-y-3">
+          {contributors.map((member, index) => (
+            <div 
+              key={member.id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-dark-900/80 border border-slate-200 dark:border-slate-800 hover:border-brand-cyan/40 transition-all shadow-xs"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-mono font-bold text-slate-500 dark:text-slate-400 w-5">
+                  #{index + 1}
+                </span>
+                <img
+                  src={member.avatar_url || 'https://avatars.githubusercontent.com/u/10101?v=4'}
+                  alt={member.username}
+                  className="w-10 h-10 rounded-full border border-slate-300 dark:border-slate-700 object-cover shrink-0"
+                />
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">{member.name || member.username}</h4>
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">@{member.username}</span>
                 </div>
               </div>
-            ))}
-          </div>
+
+              <div className="flex items-center gap-6 justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200 dark:border-slate-800">
+                <div className="text-left sm:text-right">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 block font-mono">Commits</span>
+                  <span className="text-sm font-bold text-cyan-700 dark:text-brand-cyan font-mono flex items-center gap-1 sm:justify-end">
+                    <GitCommit className="w-3.5 h-3.5" />
+                    {member.commits_count}
+                  </span>
+                </div>
+
+                <div className="text-right min-w-[90px]">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 block font-mono">Impact Score</span>
+                  <span className="text-base font-extrabold text-amber-600 dark:text-amber-400 font-mono">
+                    {member.impact_score} <span className="text-[10px] text-slate-500">pts</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

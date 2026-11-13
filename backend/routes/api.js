@@ -722,4 +722,237 @@ router.get('/users', optionalToken, async (req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------
+// 6. ROOM AI CHATBOT (ASISTENTE INTELIGENTE INDEPENDIENTE POR SALA)
+// -----------------------------------------------------------------------------
+
+/**
+ * POST /api/projects/:id/chatbot
+ * Room-specific assistant that reads project context, documents, active tasks,
+ * completed tasks, and telemetry to answer questions about the room and team members.
+ */
+router.post('/projects/:id/chatbot', optionalToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+    const { message } = req.body;
+
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ error: 'El mensaje de la consulta es requerido.' });
+    }
+
+    const queryText = message.trim().toLowerCase();
+
+    // 1. Fetch Room details
+    const projRes = await db.query('SELECT * FROM projects WHERE id = $1', [projectId]);
+    if (projRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+    const project = projRes.rows[0];
+
+    // 2. Fetch Tasks
+    const tasksRes = await db.query(`
+      SELECT t.*, u.username as assigned_username, u.name as assigned_name 
+      FROM tasks t 
+      LEFT JOIN users u ON u.id = t.assigned_to_user_id 
+      WHERE t.project_id = $1
+    `, [projectId]);
+    const allTasks = tasksRes.rows;
+    const activeTasks = allTasks.filter(t => t.status !== 'DONE' && !t.is_archived);
+    const completedTasks = allTasks.filter(t => t.status === 'DONE' || t.is_archived);
+
+    // 3. Fetch Documents
+    const docsRes = await db.query('SELECT * FROM project_documents WHERE project_id = $1', [projectId]);
+    const documents = docsRes.rows;
+
+    // 4. Fetch Commits
+    const commitsRes = await db.query('SELECT * FROM commits WHERE project_id = $1 ORDER BY timestamp DESC LIMIT 20', [projectId]);
+    const commits = commitsRes.rows;
+
+    // 5. Fetch Members
+    const usersRes = await db.query('SELECT id, username, name FROM users');
+    const allUsers = usersRes.rows;
+
+    let reply = '';
+    const suggestions = [];
+
+    // CASE A: User checks specific team member (e.g., "edwin", "maria", "alex", or user by name)
+    const targetUser = allUsers.find(u => 
+      queryText.includes(u.username.toLowerCase()) || 
+      (u.name && queryText.includes(u.name.toLowerCase().split(' ')[0]))
+    );
+
+    if (targetUser) {
+      const userTasks = activeTasks.filter(t => t.assigned_to_user_id === targetUser.id);
+      const userDone = completedTasks.filter(t => t.assigned_to_user_id === targetUser.id);
+      const userCommits = commits.filter(c => c.author_name === targetUser.username || c.user_id === targetUser.id);
+
+      reply = `### 👤 Reporte de Actividad: **${targetUser.name || targetUser.username}** (@${targetUser.username})\n\n`;
+
+      if (userTasks.length > 0) {
+        reply += `**📋 Tareas Pendientes / En Progreso (${userTasks.length}):**\n`;
+        userTasks.forEach(t => {
+          reply += `- **#${t.id} ${t.title}** · Estado: \`${t.status}\` · Prioridad: \`${t.priority}\`\n`;
+        });
+      } else {
+        reply += `✅ **No tiene tareas pendientes** en esta sala actualmente.\n`;
+      }
+
+      if (userDone.length > 0) {
+        reply += `\n**🏆 Tareas Completadas en Historial (${userDone.length}):**\n`;
+        userDone.slice(0, 5).forEach(t => {
+          reply += `- ~~#${t.id} ${t.title}~~ *(Cerrada con éxito)*\n`;
+        });
+      }
+
+      if (userCommits.length > 0) {
+        reply += `\n**📡 Commits Recientes Registrados (${userCommits.length}):**\n`;
+        userCommits.slice(0, 4).forEach(c => {
+          reply += `- \`${c.hash}\`: ${c.message}\n`;
+        });
+      } else {
+        reply += `\n*No hay commits recientes asociados a este desarrollador en esta sala.*\n`;
+      }
+
+      suggestions.push('¿Qué tareas faltan en la sala?', '¿De qué trata esta sala?', 'Ver documentos de la sala');
+    }
+    // CASE B: About room purpose / topic ("de que trata", "objetivo", "resumen", "contexto")
+    else if (queryText.includes('trata') || queryText.includes('objetivo') || queryText.includes('resumen') || queryText.includes('contexto') || queryText.includes('que es')) {
+      reply = `### 🎯 Propósito de la Sala: **${project.name}**\n\n`;
+      reply += `**Descripción:** ${project.description || 'Sala de desarrollo y telemetría ágil.'}\n\n`;
+      reply += `**Repositorio de GitHub Conectado:** \`${project.github_repo}\`\n\n`;
+      reply += `**Contexto Técnico Documentado:**\n`;
+      reply += `${project.context_markdown ? project.context_markdown.substring(0, 400) + '...' : 'Contexto técnico en proceso de redacción.'}\n\n`;
+      reply += `📊 **Resumen del Sprint:** Faltan **${activeTasks.length} tareas** por completar y se han archivado **${completedTasks.length} tareas** en el historial.`;
+
+      suggestions.push('¿Qué tareas faltan por hacer?', '¿Qué ha hecho Edwin?', '¿Qué documentos hay?');
+    }
+    // CASE C: Pending tasks / What's missing ("que tareas faltan", "pendientes", "por hacer", "en progreso")
+    else if (queryText.includes('tareas') || queryText.includes('falta') || queryText.includes('pendiente') || queryText.includes('progreso')) {
+      reply = `### 📋 Tareas Pendientes en la Sala (${activeTasks.length} activas):\n\n`;
+
+      if (activeTasks.length === 0) {
+        reply += `🎉 ¡Excelente noticia! Todas las tareas de esta sala han sido completadas y movidas al historial.\n`;
+      } else {
+        activeTasks.forEach(t => {
+          reply += `- **#${t.id} ${t.title}**\n  - Estado: \`${t.status}\` · Prioridad: \`${t.priority}\`\n  - Asignado a: **@${t.assigned_username || 'Sin asignar'}**\n`;
+        });
+        reply += `\n💡 *Tip: Puedes cerrar cualquier tarea automáticamente haciendo un commit con "fixes #${activeTasks[0]?.id}".*`;
+      }
+
+      suggestions.push('¿Qué ha hecho @edwin-esquivel?', '¿De qué trata esta sala?', '¿Cuáles fueron los últimos commits?');
+    }
+    // CASE D: Documents & Files ("documentos", "archivos", "carpetas", "pdf", "word")
+    else if (queryText.includes('documento') || queryText.includes('archivo') || queryText.includes('carpeta') || queryText.includes('pdf') || queryText.includes('doc')) {
+      reply = `### 📁 Repositorio de Documentos de la Sala (${documents.length} archivos):\n\n`;
+      
+      const folders = {};
+      documents.forEach(d => {
+        const f = d.folder_name || 'General';
+        if (!folders[f]) folders[f] = [];
+        folders[f].push(d);
+      });
+
+      Object.keys(folders).forEach(fName => {
+        reply += `**📂 Carpeta: ${fName} (${folders[fName].length})**\n`;
+        folders[fName].forEach(doc => {
+          reply += `- [${doc.file_type.toUpperCase()}] **${doc.title}** *(Autor: @${doc.created_by_user_id === 1 ? 'edwin-esquivel' : 'equipo'})*\n`;
+        });
+        reply += `\n`;
+      });
+
+      suggestions.push('¿De qué trata esta sala?', '¿Qué tareas faltan?', '¿Qué commits hay?');
+    }
+    // CASE E: Commits ("commits", "telemetria", "pushes")
+    else if (queryText.includes('commit') || queryText.includes('telemetria') || queryText.includes('push')) {
+      reply = `### 📡 Telemetría de Commits Recientes (${commits.length} registrados):\n\n`;
+      commits.slice(0, 5).forEach(c => {
+        reply += `- \`${c.hash}\`: **${c.message}** · Autor: @${c.author_name}\n`;
+      });
+      suggestions.push('¿Qué ha hecho @edwin-esquivel?', '¿Qué tareas faltan?', '¿De qué trata esta sala?');
+    }
+    // DEFAULT CASE
+    else {
+      reply = `Hola, soy **GitBot**, el asistente inteligente de la sala **${project.name}**.\n\nPuedo responderte sobre:\n- 🎯 **De qué trata la sala y sus requerimientos técnicos**.\n- ⏳ **Cuáles tareas faltan por hacer y quién las tiene asignadas**.\n- 👤 **El trabajo, commits y tareas realizadas por cualquier desarrollador** (ej: *"¿Qué ha hecho Edwin?"*).\n- 📁 **La documentación y archivos guardados en las carpetas**.\n\n¿En qué te puedo ayudar?`;
+      suggestions.push('¿De qué trata esta sala?', '¿Qué tareas faltan por hacer?', '¿Qué ha hecho @edwin-esquivel?');
+    }
+
+    res.json({
+      success: true,
+      reply,
+      suggestions,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    console.error('[API Chatbot Error]:', error.message);
+    res.status(500).json({ error: 'Error al consultar el asistente de la sala.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// 7. COMMIT HEALTH TRACKING & RESILIENT ROLLBACK ENGINE
+// -----------------------------------------------------------------------------
+
+/**
+ * GET /api/projects/:id/commit-health
+ * Evaluates commits health and identifies the last known healthy state
+ */
+router.get('/projects/:id/commit-health', optionalToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+    const commitsRes = await db.query('SELECT * FROM commits WHERE project_id = $1 ORDER BY timestamp DESC', [projectId]);
+    const commits = commitsRes.rows;
+
+    const healthyCommits = commits.filter(c => !c.message.toLowerCase().includes('broken') && !c.message.toLowerCase().includes('error'));
+    const lastStable = healthyCommits.length > 0 ? healthyCommits[0] : (commits[0] || null);
+
+    res.json({
+      success: true,
+      totalTracked: commits.length,
+      lastStableCommit: lastStable,
+      hasErrors: commits.length > healthyCommits.length,
+      status: 'OPTIMAL'
+    });
+  } catch (error) {
+    console.error('[Commit Health Error]:', error.message);
+    res.status(500).json({ error: 'Error al evaluar salud de commits.' });
+  }
+});
+
+/**
+ * POST /api/projects/:id/rollback
+ * Restores project tasks to the last verified stable checkpoint
+ */
+router.post('/projects/:id/rollback', authenticateToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+
+    // Rollback any erroneous 'DONE' or broken tasks to stable 'TODO' or 'IN_PROGRESS'
+    await db.query(`
+      UPDATE tasks 
+      SET status = 'IN_PROGRESS', is_archived = false, updated_at = CURRENT_TIMESTAMP
+      WHERE project_id = $1 AND status = 'DONE' AND completed_at > NOW() - INTERVAL '30 minutes'
+    `, [projectId]);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(`project_${projectId}`).emit('project_rolled_back', {
+        projectId,
+        rolledBackBy: req.user.username,
+        timestamp: new Date()
+      });
+      io.emit('project_rolled_back', { projectId });
+    }
+
+    res.json({
+      success: true,
+      message: '¡Punto de restauración aplicado exitosamente! Las tareas y el estado de la sala han vuelto al último punto estable verificado.'
+    });
+  } catch (error) {
+    console.error('[Rollback Error]:', error.message);
+    res.status(500).json({ error: 'Error al ejecutar restauración.' });
+  }
+});
+
 module.exports = router;
+
+

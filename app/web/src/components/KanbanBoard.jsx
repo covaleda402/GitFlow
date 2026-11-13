@@ -28,6 +28,7 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
   const [tasks, setTasks] = useState([]);
   const [teamUsers, setTeamUsers] = useState([]);
   const [isOwnerView, setIsOwnerView] = useState(false);
+  const [viewScope, setViewScope] = useState('ALL'); // 'ALL' | 'MY_TASKS'
   const [loading, setLoading] = useState(true);
   const [filterUser, setFilterUser] = useState('ALL');
 
@@ -185,30 +186,58 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
   };
 
   const filteredTasks = tasks.filter(task => {
-    if (filterUser === 'ALL') return true;
-    return String(task.assigned_to_user_id) === String(filterUser);
+    if (viewScope === 'MY_TASKS') {
+      return task.assigned_to_user_id === user?.id || task.created_by_user_id === user?.id;
+    }
+    if (filterUser !== 'ALL') {
+      return String(task.assigned_to_user_id) === String(filterUser);
+    }
+    return true;
   });
 
   return (
     <div className="w-full space-y-4">
       
-      {/* Privacy Notice Banner */}
-      <div className={`p-3.5 rounded-2xl border text-xs font-mono flex items-center justify-between gap-3 ${
+      {/* Privacy Notice Banner & Scope Switcher */}
+      <div className={`p-3.5 rounded-2xl border text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
         isOwnerView 
-          ? 'bg-brand-cyan/10 border-brand-cyan/30 text-slate-800 dark:text-brand-cyan' 
+          ? 'bg-cyan-500/10 border-cyan-500/30 text-slate-800 dark:text-brand-cyan' 
           : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-700 dark:text-indigo-300'
       }`}>
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 shrink-0 text-brand-cyan" />
+          <ShieldCheck className="w-4 h-4 shrink-0 text-cyan-600 dark:text-brand-cyan" />
           <span>
             {isOwnerView 
-              ? '👑 Vista de Administrador/Creador: Tienes visibilidad completa de todas las tareas del equipo.'
+              ? '👑 Vista de Administrador/Creador: Supervisión completa de todo el equipo.'
               : '🔒 Vista Personal: Solo ves tus tareas asignadas. El creador de la sala supervisa el equipo completo.'}
           </span>
         </div>
-        <span className="text-[10px] uppercase font-bold shrink-0">
-          {isOwnerView ? 'ADMIN VIEW' : 'MEMBER VIEW'}
-        </span>
+
+        {/* Scope Toggle for Owner */}
+        {isOwnerView && (
+          <div className="flex items-center bg-white dark:bg-dark-900 border border-slate-300 dark:border-slate-700 rounded-xl p-0.5 self-start sm:self-auto shrink-0 shadow-xs">
+            <button
+              onClick={() => setViewScope('ALL')}
+              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                viewScope === 'ALL'
+                  ? 'bg-cyan-500/20 text-cyan-700 dark:text-brand-cyan shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              Todo el Equipo
+            </button>
+            <button
+              onClick={() => setViewScope('MY_TASKS')}
+              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                viewScope === 'MY_TASKS'
+                  ? 'bg-cyan-500/20 text-cyan-700 dark:text-brand-cyan shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              Mis Tareas
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Kanban Top Toolbar */}
