@@ -12,7 +12,9 @@ import {
   Filter, 
   ShieldCheck, 
   Eye, 
-  Archive 
+  Archive,
+  ListChecks,
+  ChevronDown
 } from 'lucide-react';
 
 const COLUMNS = [
@@ -22,7 +24,7 @@ const COLUMNS = [
   { id: 'DONE', title: 'Terminada (Historial)', color: 'border-emerald-500/50', badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' }
 ];
 
-export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
+export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitchToReview }) {
   const { socket } = useSocket();
   const { user, token } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -36,9 +38,14 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newInstructions, setNewInstructions] = useState('');
   const [newPriority, setNewPriority] = useState('MEDIUM');
   const [newAssignedUser, setNewAssignedUser] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Instructions interactive collapsible and editing states
+  const [expandedInstructions, setExpandedInstructions] = useState({});
+  const [editingInstructionsTask, setEditingInstructionsTask] = useState(null);
 
   // Load Tasks
   const loadTasks = async () => {
@@ -151,6 +158,7 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
         body: JSON.stringify({
           title: newTitle,
           description: newDescription,
+          instructions: newInstructions,
           priority: newPriority,
           assigned_to_user_id: newAssignedUser ? parseInt(newAssignedUser, 10) : user?.id
         })
@@ -161,6 +169,7 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
         setIsModalOpen(false);
         setNewTitle('');
         setNewDescription('');
+        setNewInstructions('');
         setNewPriority('MEDIUM');
         setNewAssignedUser('');
         setTasks(prev => [...prev, data.task]);
@@ -169,6 +178,36 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
       console.error('Error creating task:', err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Save/Update Instructions handler
+  const handleSaveInstructions = async (e) => {
+    e.preventDefault();
+    if (!editingInstructionsTask) return;
+
+    try {
+      const res = await fetch(`/api/tasks/${editingInstructionsTask.id}/instructions`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          instructions: editingInstructionsTask.instructions
+        })
+      });
+
+      if (res.ok) {
+        setTasks(prev => prev.map(t => 
+          t.id === editingInstructionsTask.id 
+            ? { ...t, instructions: editingInstructionsTask.instructions } 
+            : t
+        ));
+        setEditingInstructionsTask(null);
+      }
+    } catch (err) {
+      console.error('Error saving instructions:', err);
     }
   };
 
@@ -327,6 +366,41 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
                       </p>
                     )}
 
+                    {/* Step-by-step Instructions Accordion Button */}
+                    <div className="mt-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedInstructions(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
+                        className="flex items-center gap-1 text-[11px] font-mono text-cyan-600 dark:text-brand-cyan hover:underline w-full justify-between py-1 px-2 rounded-lg bg-cyan-500/10 dark:bg-cyan-500/5 border border-cyan-500/20"
+                        title="Ver o editar instrucciones paso a paso"
+                      >
+                        <span className="flex items-center gap-1 font-semibold truncate">
+                          <ListChecks className="w-3.5 h-3.5 shrink-0" />
+                          <span>{task.instructions ? 'Pasos e Instrucciones' : '+ Añadir instrucciones'}</span>
+                        </span>
+                        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${expandedInstructions[task.id] ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {expandedInstructions[task.id] && (
+                        <div className="mt-1.5 p-2.5 rounded-xl bg-slate-50 dark:bg-dark-950/80 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300 space-y-1.5 animate-fade-in">
+                          {task.instructions ? (
+                            <div className="whitespace-pre-line leading-relaxed font-sans text-slate-800 dark:text-slate-200">
+                              {task.instructions}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-slate-400 italic font-mono">Sin pasos documentados aún.</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setEditingInstructionsTask({ id: task.id, title: task.title, instructions: task.instructions || '' })}
+                            className="text-[10px] text-cyan-600 dark:text-brand-cyan hover:underline font-mono block text-right w-full pt-1"
+                          >
+                            ✏️ Editar pasos
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Bottom: Assignee & Commits count */}
                     <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800/70 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
@@ -375,6 +449,19 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
                       </div>
                     </div>
 
+                    {/* Jump to Pre-Review button if in REVIEW */}
+                    {task.status === 'REVIEW' && onSwitchToReview && (
+                      <button
+                        type="button"
+                        onClick={onSwitchToReview}
+                        className="mt-2 w-full py-1.5 px-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-700 dark:text-purple-300 text-[11px] font-mono flex items-center justify-center gap-1.5 font-semibold transition-all shadow-xs"
+                        title="Ir al apartado de revisión previa para validar y aprobar formalmente"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Revisión Previa QA ➔</span>
+                      </button>
+                    )}
+
                   </div>
                 ))}
 
@@ -391,8 +478,8 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
 
       {/* New Task Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="glass-panel w-full max-w-lg p-6 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="glass-panel w-full max-w-lg p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Plus className="w-5 h-5 text-brand-cyan" />
@@ -422,11 +509,25 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
               <div>
                 <label className="block text-xs font-mono text-slate-600 dark:text-slate-300 mb-1">Descripción / Criterios:</label>
                 <textarea
-                  rows="3"
+                  rows="2"
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan resize-none"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan resize-none font-sans"
                   placeholder="Detalles técnicos y criterios de aceptación..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-600 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                  <ListChecks className="w-3.5 h-3.5 text-cyan-600 dark:text-brand-cyan" />
+                  Instrucciones de paso a paso:
+                </label>
+                <textarea
+                  rows="3"
+                  value={newInstructions}
+                  onChange={(e) => setNewInstructions(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan resize-none font-sans leading-relaxed"
+                  placeholder="1. Paso inicial...\n2. Siguiente paso de desarrollo...\n3. Validación y pruebas..."
                 />
               </div>
 
@@ -474,6 +575,57 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory }) {
                   className="px-5 py-2 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 shadow-md shadow-brand-cyan/20 disabled:opacity-50"
                 >
                   {submitting ? 'Guardando...' : 'Crear Tarea'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Instructions Modal */}
+      {editingInstructionsTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in font-sans">
+          <div className="glass-panel w-full max-w-lg p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <ListChecks className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
+                <span>Instrucciones: #{editingInstructionsTask.id} {editingInstructionsTask.title}</span>
+              </h3>
+              <button
+                onClick={() => setEditingInstructionsTask(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveInstructions} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-600 dark:text-slate-300 mb-1">
+                  Pasos a paso y forma de realización:
+                </label>
+                <textarea
+                  rows="6"
+                  value={editingInstructionsTask.instructions}
+                  onChange={(e) => setEditingInstructionsTask(prev => ({ ...prev, instructions: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-sans leading-relaxed resize-none"
+                  placeholder="1. Requerimiento inicial...\n2. Pasos técnicos...\n3. Validación y pruebas..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingInstructionsTask(null)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 shadow-sm"
+                >
+                  Guardar Pasos
                 </button>
               </div>
             </form>

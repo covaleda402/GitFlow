@@ -41,7 +41,7 @@ export default function JoinRoomModal({ isOpen, onClose, onJoined }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900">
+      <div className="glass-panel w-full max-w-sm p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <KeyRound className="w-5 h-5 text-brand-cyan" />
