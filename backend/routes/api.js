@@ -291,7 +291,7 @@ router.get('/projects/:id/tasks', optionalToken, async (req, res) => {
 router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
-    const { title, description = '', status = 'TODO', priority = 'MEDIUM', assigned_to_user_id } = req.body;
+    const { title, description = '', instructions = '', status = 'TODO', priority = 'MEDIUM', assigned_to_user_id } = req.body;
 
     if (!title || title.trim() === '') {
       return res.status(400).json({ error: 'El título de la tarea es requerido.' });
@@ -300,14 +300,15 @@ router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
     const assignedId = assigned_to_user_id ? parseInt(assigned_to_user_id, 10) : req.user.id;
 
     const insertQuery = `
-      INSERT INTO tasks (project_id, title, description, status, priority, assigned_to_user_id, created_by_user_id) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7) 
+      INSERT INTO tasks (project_id, title, description, instructions, status, priority, assigned_to_user_id, created_by_user_id) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
       RETURNING *
     `;
     const insertRes = await db.query(insertQuery, [
       projectId,
       title.trim(),
       description.trim(),
+      instructions.trim(),
       status,
       priority,
       assignedId,
@@ -346,6 +347,45 @@ router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
 });
 
 /**
+ * PATCH /api/tasks/:id/instructions
+ * Updates step-by-step instructions for a task
+ */
+router.patch('/tasks/:id/instructions', authenticateToken, async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const { instructions = '' } = req.body;
+
+    const updateQuery = `
+      UPDATE tasks 
+      SET instructions = $1, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $2 
+      RETURNING *
+    `;
+    const result = await db.query(updateQuery, [instructions.trim(), taskId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada.' });
+    }
+
+    const updatedTask = result.rows[0];
+
+    const io = req.app.get('socketio');
+    if (io && updatedTask.project_id) {
+      io.to(`project_${updatedTask.project_id}`).emit('task_status_changed', updatedTask);
+    }
+
+    res.json({
+      success: true,
+      message: 'Instrucciones actualizadas con éxito.',
+      task: updatedTask
+    });
+  } catch (error) {
+    console.error('[API Task Instructions Error]:', error.message);
+    res.status(500).json({ error: 'Error al actualizar instrucciones de la tarea.' });
+  }
+});
+
+/**
  * PATCH /api/tasks/:id/status
  * Transitions task through: TODO -> IN_PROGRESS -> REVIEW -> DONE
  * When marked as DONE, marks completed_at and moves to task history!
@@ -353,7 +393,7 @@ router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
 router.patch('/tasks/:id/status', authenticateToken, async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
-    const { status } = req.body;
+    const { status, completion_notes } = req.body;
 
     const allowed = ['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE'];
     if (!allowed.includes(status)) {
@@ -361,16 +401,18 @@ router.patch('/tasks/:id/status', authenticateToken, async (req, res) => {
     }
 
     const isDone = status === 'DONE';
+    const notes = completion_notes !== undefined ? (completion_notes ? String(completion_notes).trim() : '') : null;
     const updateQuery = `
       UPDATE tasks 
       SET status = $1, 
           is_archived = $2, 
           completed_at = CASE WHEN $2 = true THEN CURRENT_TIMESTAMP ELSE NULL END,
+          completion_notes = CASE WHEN $3::text IS NOT NULL THEN $3::text ELSE completion_notes END,
           updated_at = CURRENT_TIMESTAMP 
-      WHERE id = $3 
+      WHERE id = $4 
       RETURNING *
     `;
-    const result = await db.query(updateQuery, [status, isDone, taskId]);
+    const result = await db.query(updateQuery, [status, isDone, notes, taskId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Tarea no encontrada.' });

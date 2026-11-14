@@ -18,7 +18,8 @@ import {
   BarChart3, 
   KeyRound, 
   ChevronDown,
-  Bot
+  Bot,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoom, onSimulatePush, onOpenChatbot }) {
@@ -51,6 +52,7 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
   const navItems = [
     { label: 'Panel General (Hub)', tab: 'dashboard', path: '/dashboard', icon: GitBranch },
     { label: 'Tablero Ágil', tab: 'kanban', path: `/projects/${projectId}?tab=kanban`, icon: Layers },
+    { label: 'Revisión Previa (QA)', tab: 'review', path: `/projects/${projectId}?tab=review`, icon: ShieldCheck },
     { label: 'Documentos & Contexto', tab: 'documents', path: `/projects/${projectId}?tab=documents`, icon: FileText },
     { label: 'Historial Terminado', tab: 'history', path: `/projects/${projectId}?tab=history`, icon: Archive },
     { label: 'Telemetría y Respaldo', tab: 'telemetry', path: `/projects/${projectId}?tab=telemetry`, icon: Radio },

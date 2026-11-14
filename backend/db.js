@@ -100,6 +100,7 @@ const mockStore = {
       project_id: 1,
       title: 'Configurar autenticación OAuth con GitHub',
       description: 'Implementar endpoints de redirección y callback con intercambio de tokens.',
+      instructions: '1. Crear OAuth App en GitHub Developer Settings.\n2. Configurar GITHUB_CLIENT_ID y GITHUB_CLIENT_SECRET en .env.\n3. Implementar ruta /api/auth/github/callback para intercambiar el code temporal por access_token.\n4. Firmar y emitir JWT con expiración de 7 días.',
       status: 'DONE',
       priority: 'HIGH',
       assigned_to_user_id: 1,
@@ -114,6 +115,7 @@ const mockStore = {
       project_id: 1,
       title: 'Construir endpoint receptor de Webhooks de GitHub',
       description: 'Procesar payloads de push, extraer autores y vincular commits a tareas.',
+      instructions: '1. Configurar ruta POST /api/webhook/github para escuchar eventos de push.\n2. Procesar el arreglo de commits y extraer referencias numéricas tipo #ID con regex.\n3. Almacenar el commit en la base de datos vinculándolo a la tarea correspondiente.\n4. Emitir telemetría new_commit por WebSockets a toda la sala.',
       status: 'DONE',
       priority: 'URGENT',
       assigned_to_user_id: 2,
@@ -128,6 +130,7 @@ const mockStore = {
       project_id: 1,
       title: 'Editor colaborativo de Markdown en tiempo real',
       description: 'Sincronizar cursor y contenido entre miembros del equipo con Socket.io.',
+      instructions: '1. Inicializar SocketContext y escuchar eventos typing_context.\n2. Emitir live_context_stream al detectar cambios en el textarea de Markdown.\n3. Sincronizar el estado entre clientes conectados a la sala project_{id}.\n4. Persistir cambios en la base de datos mediante el botón Guardar.',
       status: 'IN_PROGRESS',
       priority: 'HIGH',
       assigned_to_user_id: 1,
@@ -142,6 +145,7 @@ const mockStore = {
       project_id: 1,
       title: 'Dashboard de telemetría y métricas de impacto',
       description: 'Calcular velocidad del equipo, cruce de commits y tareas completadas.',
+      instructions: '1. Consultar historial de commits y tareas terminadas del sprint.\n2. Calcular fórmula de impacto: (Commits * 10) + (Tareas * 25).\n3. Renderizar gráficos de barras y tarjetas de velocidad por miembro.\n4. Actualizar métricas dinámicamente al recibir nuevos eventos de push.',
       status: 'IN_PROGRESS',
       priority: 'MEDIUM',
       assigned_to_user_id: 3,
@@ -156,6 +160,7 @@ const mockStore = {
       project_id: 1,
       title: 'Implementar filtros y búsqueda en el Kanban',
       description: 'Permitir filtrar tareas por desarrollador asignado, estado y prioridad.',
+      instructions: '1. Añadir barra de búsqueda rápida por título o código de tarea.\n2. Implementar selector de desarrollador para alternar entre vista personal y global.\n3. Filtrar columnas del Kanban de manera reactiva sin recargar la página.',
       status: 'REVIEW',
       priority: 'LOW',
       assigned_to_user_id: 2,
@@ -170,6 +175,7 @@ const mockStore = {
       project_id: 1,
       title: 'Salas dinámicas con código de 5 minutos',
       description: 'Generación de código temporal OTP que rota cada 5 minutos por seguridad.',
+      instructions: '1. Implementar función de hash HMAC/SHA-256 basada en ventanas de 300 segundos.\n2. Exponer endpoint GET /api/projects/:id/security-code para el dueño de la sala.\n3. Permitir ingreso de miembros mediante POST /api/projects/join con código activo.\n4. Incluir margen de tolerancia de 30 segundos con el código de la ventana previa.',
       status: 'TODO',
       priority: 'URGENT',
       assigned_to_user_id: 1,
@@ -184,6 +190,7 @@ const mockStore = {
       project_id: 1,
       title: 'Soporte para cambio de tema Claro y Oscuro',
       description: 'Alternador de tema con persistencia local y soporte para móvil.',
+      instructions: '1. Configurar ThemeContext con detección de preferencia del sistema y localStorage.\n2. Aplicar clases dark de Tailwind en el tag <html>.\n3. Diseñar botón de sol/luna tanto en la barra lateral de escritorio como en la cabecera móvil.',
       status: 'DONE',
       priority: 'MEDIUM',
       assigned_to_user_id: 1,
@@ -198,6 +205,7 @@ const mockStore = {
       project_id: 1,
       title: 'Repositorio de Documentos estilo carpetas',
       description: 'Organización de archivos .md, .pdf, .docx e imágenes por categorías.',
+      instructions: '1. Definir categorías de carpetas: Arquitectura, Diseño & UX, Reuniones & Notas.\n2. Soportar extensiones .md, .pdf, .docx e imágenes con badges distintivos.\n3. Crear visor modal de documentos y formulario para anexar nuevas referencias.',
       status: 'TODO',
       priority: 'HIGH',
       assigned_to_user_id: 3,
@@ -405,7 +413,7 @@ async function query(text, params = []) {
  * Fallback SQL handler for offline or non-configured local environments
  */
 function executeMockFallback(text, params) {
-  const normalized = text.trim().toLowerCase();
+  const normalized = text.trim().toLowerCase().replace(/\s+/g, ' ');
 
   // 1. SELECT users BY github_id
   if (normalized.includes('from users where github_id = $1')) {
@@ -545,8 +553,49 @@ function executeMockFallback(text, params) {
     return { rows: [exists], rowCount: 1 };
   }
 
+  // 9b. INSERT INTO tasks
+  if (normalized.startsWith('insert into tasks')) {
+    let newTask;
+    if (normalized.includes('instructions')) {
+      // params: [projectId, title, description, instructions, status, priority, assignedId, req.user.id]
+      newTask = {
+        id: mockStore.tasks.length + 1,
+        project_id: Number(params[0]),
+        title: params[1],
+        description: params[2] || '',
+        instructions: params[3] || '',
+        status: params[4] || 'TODO',
+        priority: params[5] || 'MEDIUM',
+        assigned_to_user_id: params[6] ? Number(params[6]) : 1,
+        created_by_user_id: params[7] ? Number(params[7]) : 1,
+        is_archived: false,
+        completed_at: null,
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+    } else {
+      newTask = {
+        id: mockStore.tasks.length + 1,
+        project_id: Number(params[0]),
+        title: params[1],
+        description: params[2] || '',
+        instructions: '',
+        status: params[3] || 'TODO',
+        priority: params[4] || 'MEDIUM',
+        assigned_to_user_id: params[5] ? Number(params[5]) : 1,
+        created_by_user_id: params[6] ? Number(params[6]) : 1,
+        is_archived: false,
+        completed_at: null,
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+    }
+    mockStore.tasks.push(newTask);
+    return { rows: [newTask], rowCount: 1 };
+  }
+
   // 10. SELECT tasks BY project_id (with privacy check)
-  if (normalized.includes('from tasks') && normalized.includes('project_id = $1')) {
+  if (normalized.includes('from tasks') && normalized.includes('project_id = $1') && !normalized.includes('is_archived = true') && !normalized.includes("status = 'done'")) {
     const projectId = Number(params[0]);
     const userId = params[1] ? Number(params[1]) : null;
     const project = mockStore.projects.find(p => p.id === projectId);
@@ -587,11 +636,16 @@ function executeMockFallback(text, params) {
 
     const result = filtered.map(t => {
       const user = mockStore.users.find(u => u.id === t.assigned_to_user_id);
+      const creator = mockStore.users.find(u => u.id === t.created_by_user_id);
+      const commitsCount = mockStore.commits.filter(c => c.task_id === t.id).length;
       return {
         ...t,
         assigned_username: user ? user.username : null,
         assigned_name: user ? user.name : null,
-        assigned_avatar_url: user ? (user.custom_avatar || user.avatar_url) : null
+        assigned_avatar_url: user ? (user.custom_avatar || user.avatar_url) : null,
+        created_by_username: creator ? creator.username : null,
+        created_by_name: creator ? creator.name : null,
+        commits_count: commitsCount
       };
     });
     return { rows: result, rowCount: result.length };
@@ -599,11 +653,14 @@ function executeMockFallback(text, params) {
 
   // 12. UPDATE tasks SET status
   if (normalized.startsWith('update tasks set status')) {
-    const taskId = Number(params[1]);
+    const taskId = Number(params[params.length - 1]);
     const nextStatus = params[0];
     const task = mockStore.tasks.find(t => t.id === taskId);
     if (task) {
       task.status = nextStatus;
+      if (params.length >= 4 && params[2] !== null && params[2] !== undefined) {
+        task.completion_notes = params[2];
+      }
       if (nextStatus === 'DONE') {
         task.completed_at = new Date();
         task.is_archived = true;
@@ -611,6 +668,19 @@ function executeMockFallback(text, params) {
         task.is_archived = false;
         task.completed_at = null;
       }
+      task.updated_at = new Date();
+      return { rows: [task], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  // 12b. UPDATE tasks SET instructions
+  if (normalized.startsWith('update tasks set instructions')) {
+    const taskId = Number(params[1]);
+    const newInstructions = params[0];
+    const task = mockStore.tasks.find(t => t.id === taskId);
+    if (task) {
+      task.instructions = newInstructions;
       task.updated_at = new Date();
       return { rows: [task], rowCount: 1 };
     }

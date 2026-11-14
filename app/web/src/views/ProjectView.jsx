@@ -8,6 +8,7 @@ import KanbanBoard from '../components/KanbanBoard';
 import ProjectDocuments from '../components/ProjectDocuments';
 import LiveContextEditor from '../components/LiveContextEditor';
 import TaskHistory from '../components/TaskHistory';
+import PreReviewSection from '../components/PreReviewSection';
 import ActivityFeed from '../components/ActivityFeed';
 import CommitRollbackManager from '../components/CommitRollbackManager';
 import ContributionDashboard from '../components/ContributionDashboard';
@@ -24,7 +25,8 @@ import {
   ExternalLink,
   Users,
   Bot,
-  Sparkles
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function ProjectView() {
@@ -83,6 +85,7 @@ export default function ProjectView() {
 
   const tabs = [
     { id: 'kanban', label: 'Tablero Ágil', icon: Layers },
+    { id: 'review', label: 'Revisión Previa (QA)', icon: ShieldCheck },
     { id: 'documents', label: 'Documentos & Contexto', icon: FileText },
     { id: 'history', label: 'Historial Terminado', icon: Archive },
     { id: 'telemetry', label: 'Telemetría Commits', icon: Radio },
@@ -175,6 +178,15 @@ export default function ProjectView() {
             <KanbanBoard 
               projectId={projectId} 
               onSwitchToHistory={() => handleTabChange('history')} 
+              onSwitchToReview={() => handleTabChange('review')}
+            />
+          )}
+
+          {activeTab === 'review' && (
+            <PreReviewSection 
+              projectId={projectId}
+              onSwitchToKanban={() => handleTabChange('kanban')}
+              onSwitchToHistory={() => handleTabChange('history')}
             />
           )}
 
