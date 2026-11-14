@@ -130,7 +130,10 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ status: nextStatus })
+        body: JSON.stringify({ 
+          status: nextStatus,
+          completion_notes: nextStatus === 'DONE' ? 'Completada y archivada desde el Tablero Ágil.' : null
+        })
       });
 
       if (!res.ok) {

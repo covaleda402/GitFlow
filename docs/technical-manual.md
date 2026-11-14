@@ -65,9 +65,12 @@ The platform continuously audits ingested commits to guarantee codebase stabilit
 | `GET` | `/api/projects/:id/security-code` | Retrieve current 5-min dynamic room code | Yes (JWT) |
 | `POST` | `/api/projects/join` | Join room via 5-min dynamic code | Yes (JWT) |
 | `GET` | `/api/projects/:id/tasks` | Fetch tasks (Filtered personal for members, full for Owner) | Optional |
-| `POST` | `/api/projects/:id/tasks` | Create new agile task | Yes (JWT) |
-| `PATCH` | `/api/tasks/:id/status` | Advance task status (TODO ➔ IN_PROGRESS ➔ REVIEW ➔ DONE) | Yes (JWT) |
-| `GET` | `/api/projects/:id/history` | Completed and archived tasks history | Optional |
+| `POST` | `/api/projects/:id/tasks` | Create new agile task with step-by-step instructions | Yes (JWT) |
+| `PATCH` | `/api/tasks/:id/instructions` | Update technical step-by-step instructions of a task | Yes (JWT) |
+| `PATCH` | `/api/tasks/:id/status` | Advance task status (TODO ➔ IN_PROGRESS ➔ REVIEW ➔ DONE) with QA notes | Yes (JWT) |
+| `GET` | `/api/projects/:id/commit-health` | Audit commit integrity and retrieve last known good checkpoint | Optional |
+| `POST` | `/api/projects/:id/rollback` | Resilient 1-click restore to last verified stable checkpoint | Yes (JWT) |
+| `GET` | `/api/projects/:id/history` | Completed tasks history with exact completion timestamps | Optional |
 | `GET` | `/api/projects/:id/documents` | Files and documents organized by folders | Optional |
 | `POST` | `/api/projects/:id/documents` | Upload/register file (.md, .pdf, .docx, img) | Yes (JWT) |
 | `POST` | `/api/projects/:id/chatbot` | Query room-specific AI Assistant (GitBot) | Optional |

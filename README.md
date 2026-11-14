@@ -20,20 +20,28 @@
 1. **Salas de Trabajo Seguras con Código Dinámico (Rotación de 5 Minutos)**:
    - Cualquier desarrollador puede crear salas de proyectos independientes.
    - Acceso seguro mediante **códigos temporales de 6 caracteres que rotan automáticamente cada 5 minutos**, evitando accesos no autorizados.
-2. **Privacidad de Tareas y Roles Inteligentes**:
-   - **Vista de Creador (Admin)**: Supervisión completa del avance global de todo el equipo y métricas de velocidad.
-   - **Vista de Miembros**: Tablero enfocado exclusivamente en sus **tareas personales**, eliminando distracciones.
-3. **Flujo Ágil y Archivo en Historial**:
-   - Transición de tareas: `Por Hacer` ➔ `En Progreso` ➔ `En Revisión` ➔ `Terminada`.
-   - Al marcar una tarea como **Terminada**, se archiva en el **Historial Dedicado** con fecha, hora y responsable.
-4. **Repositorio de Documentos & Contexto por Carpetas**:
+2. **Privacidad de Tareas y Panel de Vista Personal**:
+   - **Vista de Creador (Admin)**: Supervisión completa del avance global de todo el equipo, conmutador rápido entre *Todo el Equipo* y *Mis Tareas*, y filtros dinámicos por miembro.
+   - **Vista Personal de Miembros**: Tablero filtrado enfocado exclusivamente en sus **tareas personales asignadas**, garantizando foco y privacidad.
+3. **Flujo Ágil con Instrucciones Técnicas y Control de Calidad (QA)**:
+   - Documentación paso a paso de tareas con el campo interactivo **Instrucciones Técnicas** (`instructions`).
+   - Ciclo ágil: `Por Hacer` ➔ `En Progreso` ➔ `En Revisión` ➔ `Revisión Previa (QA)` ➔ `Terminada`.
+   - **Módulo de QA (Pre-Review)** con checklist de 4 puntos de control de calidad antes del cierre definitivo.
+4. **Historial Detallado y Trazabilidad**:
+   - Al cerrar una tarea, se archiva en el **Historial Terminado** con fecha y hora exacta (`completed_at`), commits vinculados y acordeón de notas técnicas de finalización.
+5. **Control de Commits y Motor de Respaldo Continuo (Rollback Engine)**:
+   - Auditoría en tiempo real de commits. Identificación de fallos y botón de **Restauración en 1 Clic al último respaldo funcional estable**.
+6. **Editor Colaborativo en Vivo con Soporte de Alto Contraste**:
+   - Sincronización en tiempo real vía WebSockets con streaming de borradores y presencia de colaboradores.
+   - Renderizado optimizado para **Tema Claro y Tema Oscuro** con soporte de negritas, código, citas en bloque y listas.
+7. **Redirección Inmediata y Acceso Rápido desde el Panel (Hub Fast Nav)**:
+   - Acceso instantáneo en 1 clic a cualquier módulo del proyecto (Tablero Ágil, QA, Documentos, Telemetría) directamente desde el Dashboard principal.
+8. **Repositorio de Documentos & Contexto por Carpetas**:
    - Explorador de archivos organizado por carpetas (*Arquitectura, Diseño & UX, Reuniones & Notas, Documentación General*).
-   - Soporte para notas Markdown (`.md`) con editor colaborativo en vivo, guías PDF (`.pdf`), documentos Word (`.docx`) y visor interactivo de imágenes con **zoom**.
-5. **Control de Commits y Respaldo Continuo (Rollback Engine)**:
-   - Rastreo automático de salud por commit. Si un commit presenta errores o regresiones, la plataforma permite restaurar con **1 clic al último punto funcional estable**.
-6. **Chatbot Inteligente de Sala (GitBot AI)**:
+   - Soporte para notas Markdown (`.md`), guías PDF (`.pdf`), documentos Word (`.docx`) y visor interactivo de imágenes con **zoom**.
+9. **Chatbot Inteligente de Sala (GitBot AI)**:
    - Asistente conversacional por sala que lee el contexto, explica de qué trata el proyecto, detalla tareas pendientes y reporta los aportes y commits de cualquier integrante.
-7. **Diseño Adaptativo Claro / Oscuro & Navegación Móvil TikTok Style**:
+10. **Diseño Adaptativo Claro / Oscuro & Navegación Móvil TikTok Style**:
    - Selector fluido de temas con persistencia local.
    - **Desktop**: Barra lateral izquierda fija (*Sidebar*) con acceso a todos los apartados.
    - **Móvil**: Barra táctil inferior estilo TikTok con botón central de acción rápida.

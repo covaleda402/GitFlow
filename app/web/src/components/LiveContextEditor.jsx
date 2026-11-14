@@ -132,38 +132,112 @@ export default function LiveContextEditor({ projectId = 1 }) {
     }
   };
 
-  // High contrast renderer in both light and dark mode
+  // High contrast inline parser for bold, italics, code, and strikethrough in light & dark mode
+  const parseInline = (text) => {
+    if (!text) return null;
+    const tokens = text.split(/(\*\*.*?\*\*|`.*?`|~~.*?~~|\*.*?\*)/g);
+    return tokens.map((token, i) => {
+      if (!token) return null;
+      if (token.startsWith('**') && token.endsWith('**') && token.length >= 4) {
+        return (
+          <strong key={i} className="font-extrabold text-slate-900 dark:text-white">
+            {token.slice(2, -2)}
+          </strong>
+        );
+      }
+      if (token.startsWith('`') && token.endsWith('`') && token.length >= 2) {
+        return (
+          <code key={i} className="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-dark-900 text-cyan-800 dark:text-brand-cyan border border-slate-300 dark:border-slate-800 font-semibold">
+            {token.slice(1, -1)}
+          </code>
+        );
+      }
+      if (token.startsWith('~~') && token.endsWith('~~') && token.length >= 4) {
+        return (
+          <del key={i} className="line-through text-slate-400 dark:text-slate-500">
+            {token.slice(2, -2)}
+          </del>
+        );
+      }
+      if (token.startsWith('*') && token.endsWith('*') && token.length >= 2 && !token.startsWith('**')) {
+        return (
+          <em key={i} className="italic text-slate-800 dark:text-slate-200">
+            {token.slice(1, -1)}
+          </em>
+        );
+      }
+      return token;
+    });
+  };
+
+  // High contrast renderer in both light and dark mode with rich Markdown support
   const renderSimpleMarkdown = (text) => {
+    if (!text) {
+      return (
+        <p className="text-xs text-slate-400 dark:text-slate-500 italic font-mono">
+          El documento está vacío. Empieza a escribir en el editor...
+        </p>
+      );
+    }
+
     return text
       .split('\n')
       .map((line, idx) => {
-        if (line.startsWith('# ')) {
-          return <h1 key={idx} className="text-2xl font-extrabold text-slate-900 dark:text-white mt-4 mb-2 pb-1.5 border-b border-slate-200 dark:border-slate-800">{line.replace('# ', '')}</h1>;
-        }
-        if (line.startsWith('## ')) {
-          return <h2 key={idx} className="text-xl font-bold text-cyan-700 dark:text-brand-cyan mt-4 mb-2">{line.replace('## ', '')}</h2>;
-        }
-        if (line.startsWith('### ')) {
-          return <h3 key={idx} className="text-base font-bold text-slate-800 dark:text-slate-200 mt-3 mb-1">{line.replace('### ', '')}</h3>;
-        }
-        if (line.startsWith('- ')) {
+        const trimmed = line.trim();
+
+        if (trimmed.startsWith('# ')) {
           return (
-            <li key={idx} className="ml-5 list-disc text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-              {line.replace('- ', '')}
+            <h1 key={idx} className="text-2xl font-extrabold text-slate-900 dark:text-white mt-5 mb-2.5 pb-2 border-b border-slate-200 dark:border-slate-800 tracking-tight">
+              {parseInline(trimmed.replace(/^#\s+/, ''))}
+            </h1>
+          );
+        }
+        if (trimmed.startsWith('## ')) {
+          return (
+            <h2 key={idx} className="text-lg font-bold text-cyan-700 dark:text-brand-cyan mt-4 mb-2 tracking-tight">
+              {parseInline(trimmed.replace(/^##\s+/, ''))}
+            </h2>
+          );
+        }
+        if (trimmed.startsWith('### ')) {
+          return (
+            <h3 key={idx} className="text-sm font-bold text-slate-900 dark:text-slate-200 mt-3 mb-1.5 flex items-center gap-1.5">
+              {parseInline(trimmed.replace(/^###\s+/, ''))}
+            </h3>
+          );
+        }
+        if (trimmed.startsWith('> ')) {
+          return (
+            <blockquote key={idx} className="my-2.5 p-3 rounded-r-2xl border-l-4 border-cyan-600 dark:border-brand-cyan bg-cyan-500/5 dark:bg-cyan-500/10 text-xs text-slate-800 dark:text-slate-200 font-sans leading-relaxed">
+              {parseInline(trimmed.replace(/^>\s+/, ''))}
+            </blockquote>
+          );
+        }
+        if (trimmed === '---' || trimmed === '***') {
+          return <hr key={idx} className="my-4 border-slate-200 dark:border-slate-800" />;
+        }
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          return (
+            <li key={idx} className="ml-5 list-disc text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed py-0.5">
+              {parseInline(trimmed.replace(/^[-*]\s+/, ''))}
             </li>
           );
         }
-        if (/^\d+\.\s/.test(line)) {
+        if (/^\d+\.\s/.test(trimmed)) {
           return (
-            <li key={idx} className="ml-5 list-decimal text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-              {line.replace(/^\d+\.\s/, '')}
+            <li key={idx} className="ml-5 list-decimal text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed py-0.5 font-sans">
+              {parseInline(trimmed.replace(/^\d+\.\s/, ''))}
             </li>
           );
         }
-        if (line.trim() === '') {
+        if (trimmed === '') {
           return <div key={idx} className="h-2" />;
         }
-        return <p key={idx} className="text-xs sm:text-sm text-slate-800 dark:text-slate-300 leading-relaxed mb-1.5">{line}</p>;
+        return (
+          <p key={idx} className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed mb-2 font-sans">
+            {parseInline(line)}
+          </p>
+        );
       });
   };
 

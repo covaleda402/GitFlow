@@ -42,42 +42,70 @@ Bienvenido a la guía oficial de usuario de **GitFlow**. Esta plataforma unifica
 
 ---
 
-## 4. Tablero Ágil (Kanban) y Privacidad de Tareas
+## 4. Tablero Ágil (Kanban), Instrucciones y Privacidad de Tareas
 
 * **Privacidad Inteligente**:
   - **Si eres Miembro**: Solo verás **tus tareas personales**, manteniendo tu espacio enfocado.
-  - **Si eres el Creador**: Tienes supervisión completa de **todo el equipo** y puedes filtrar por cualquier miembro.
+  - **Si eres el Creador**: Tienes supervisión completa de **todo el equipo** y puedes alternar entre *Todo el Equipo* y *Mis Tareas*, o filtrar por cualquier integrante.
+* **Instrucciones Técnicas Paso a Paso**:
+  - Cada tarjeta en el Kanban incluye un botón desplegable **`Pasos e Instrucciones`**.
+  - Al abrirlo, podrás consultar la guía paso a paso documentada para ejecutar la tarea o pulsar **`✏️ Editar pasos`** para afinarla en vivo.
 * **Ciclo de Vida de una Tarea**:
-  $$\text{Por Hacer} \longrightarrow \text{En Progreso} \longrightarrow \text{En Revisión} \longrightarrow \text{Terminada}$$
+  $$\text{Por Hacer} \longrightarrow \text{En Progreso} \longrightarrow \text{En Revisión} \longrightarrow \text{Revisión Previa (QA)} \longrightarrow \text{Terminada}$$
 * **Cierre Automático por Git**:
   - Si realizas un commit con el mensaje `feat: login #3`, la tarea #3 pasa a *En Progreso*.
   - Si tu commit incluye `fixes #3` o `closes #3`, la tarea se marca como **Terminada** y se traslada automáticamente al **Historial**.
 
 ---
 
-## 5. Historial Terminado
+## 5. Control de Calidad & Revisión Previa (QA)
+
+Antes de archivar una tarea en el historial definitivo, la pestaña **Revisión Previa (QA)** actúa como la puerta de control de calidad:
+
+1. **Checklist Interactivo de Verificación**:
+   - ✅ *Cero errores de compilación y pruebas*.
+   - ✅ *Paso a paso cumplido cabalmente*.
+   - ✅ *Código limpio, sin credenciales ni fugas*.
+   - ✅ *Responsive móvil y estilo verificado*.
+2. **Dictamen y Observaciones**:
+   - Puedes redactar notas de auditoría en la casilla de observaciones.
+   - **Aprobar y Finalizar (DONE)**: Cierra la tarea guardando las notas de calidad en el historial.
+   - **Solicitar Ajustes (Devolver a En Progreso)**: Devuelve la tarea con feedback técnico claro para que el desarrollador aplique las correcciones.
+
+---
+
+## 6. Historial Terminado y Trazabilidad
 
 En el apartado **Historial Terminado** se almacenan todas las tareas cerradas. Cada tarjeta muestra:
 - Número de tarea `#ID` y título.
 - Desarrollador responsable y su avatar.
 - Fecha y hora exacta de finalización (`13 nov 2026 · 02:45 PM`).
 - Número de commits asociados.
+- Acordeón **"Ver notas de finalización y pasos cumplidos"**: Despliega la auditoría técnica completa de cómo se completó la tarea.
 
 ---
 
-## 6. Documentos y Contexto (Organización por Carpetas)
+## 7. Control de Commits y Motor de Respaldo (Rollback Engine)
+
+En la pestaña **Telemetría y Respaldo**:
+- Monitorea la integridad de todos los commits que llegan mediante Webhooks de GitHub.
+- Si un push introduce un bug o rompe la aplicación, el botón **`Restaurar a Último Respaldo`** permite devolver las tareas y el estado al último checkpoint funcional con **1 solo clic**.
+
+---
+
+## 8. Documentos, Contexto y Editor Colaborativo en Vivo
 
 En la sección **Documentos & Contexto** encontrarás:
 1. **Explorador por Carpetas**: Carpetas visuales categorizadas (*Arquitectura*, *Diseño & UX*, *Reuniones & Notas*, *Documentación General*).
 2. **Formatos Soportados**:
-   - **Markdown (`.md`)**: Puedes leer el documento o abrir el **Editor Colaborativo en Vivo** para redactar en tiempo real.
+   - **Markdown (`.md`)**: Puedes leer el documento o abrir el **Editor Colaborativo en Vivo** con alta legibilidad en **Modo Claro y Modo Oscuro**, citas, listas y sincronización instantánea por WebSockets.
    - **PDF (`.pdf`) y Word (`.docx`)**: Con enlaces directos para abrir o descargar.
    - **Imágenes (`.img`)**: Miniaturas con el botón **"Ver con Zoom"** que abre un visor interactivo con controles de aumento y alejamiento.
 3. **Nuevo Documento**: Pulsa el botón `+ Nuevo Documento` para registrar archivos, notas o enlaces en cualquier carpeta.
 
 ---
 
-## 7. Chatbot de Sala (GitBot AI)
+## 9. Chatbot de Sala (GitBot AI)
 
 En la esquina inferior derecha verás el botón flotante **GitBot Asistente**:
 - Haz clic sobre él para abrir el chat inteligente de la sala.

@@ -167,9 +167,9 @@ app.use((err, req, res, next) => {
 });
 
 // -----------------------------------------------------------------------------
-// START SERVER
+// START SERVER (Solo en entorno local / servidor dedicado, no en Vercel Serverless)
 // -----------------------------------------------------------------------------
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(`🚀 GitFlow Server running on port ${PORT}`);

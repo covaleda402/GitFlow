@@ -42,42 +42,69 @@ Welcome to the official user guide for **GitFlow** (RepoSync / GitPulse). This p
 
 ---
 
-## 4. Agile Kanban Board & Task Privacy
+## 4. Agile Kanban Board, Step-by-Step Instructions & Task Privacy
 
-* **Intelligent Privacy**:
+* **Intelligent Privacy & View Scope**:
   - **Members**: Focused personal view displaying only tasks assigned to or created by them.
-  - **Room Owner**: Comprehensive team view with developer filter dropdown.
+  - **Room Owner**: Comprehensive team supervision with a quick toggle between *All Team* and *My Tasks*, plus a developer filter dropdown.
+* **Step-by-Step Technical Instructions**:
+  - Each task card includes a collapsible **`Steps & Instructions`** section.
+  - Review documented implementation instructions or click **`✏️ Edit steps`** to refine technical criteria on the fly.
 * **Task Lifecycle**:
-  $$\text{To Do} \longrightarrow \text{In Progress} \longrightarrow \text{In Review} \longrightarrow \text{Done}$$
+  $$\text{To Do} \longrightarrow \text{In Progress} \longrightarrow \text{In Review} \longrightarrow \text{Pre-Review QA} \longrightarrow \text{Done}$$
 * **Autonomous Git Triggering**:
   - Pushing a commit containing `feat: login #3` advances task #3 to *In Progress*.
   - Pushing a commit containing `fixes #3` or `closes #3` marks task #3 as **Done** and automatically moves it to the **History Archive**.
 
 ---
 
-## 5. Completed Tasks History
+## 5. Quality Control & Pre-Review (QA Gate)
 
-The **Completed History** section archives finished tasks. Each card displays:
-- Task ID `#ID` and strikethrough title.
-- Assignee developer and avatar.
-- Exact completion timestamp (`Nov 13, 2026 · 02:45 PM`).
-- Linked commits counter.
+Before tasks are permanently closed, the **Pre-Review (QA)** section provides strict verification:
+
+1. **Interactive Quality Checklist**:
+   - ✅ *Clean compilation & testing with zero errors*.
+   - ✅ *Step-by-step instructions fulfilled accurately*.
+   - ✅ *Clean code without leaks or secrets*.
+   - ✅ *Responsive mobile and aesthetic layout verified*.
+2. **Review Notes & QA Decision**:
+   - **Approve and Finalize (DONE)**: Archives the task to history accompanied by verified QA notes.
+   - **Request Changes (Reject)**: Returns the task to `IN_PROGRESS` with specific actionable feedback.
 
 ---
 
-## 6. Document & Context Explorer (Folders & Zoom)
+## 6. Completed Tasks History & Detailed Audit
+
+The **Completed History** section archives finished tasks. Each card displays:
+- Task ID `#ID` and title.
+- Assignee developer and avatar.
+- Exact completion timestamp (`Nov 13, 2026 · 02:45 PM`).
+- Linked commits counter.
+- **"View completion notes and fulfilled steps"** accordion: Expandable technical record detailing how the task was completed.
+
+---
+
+## 7. Commit Health & Resilient Rollback Engine
+
+Located under **Telemetry and Resilient Backup**:
+- Continuously tracks the integrity of incoming GitHub commits.
+- If a push causes an issue or regression, click **`Restore to Last Backup`** to roll back project tasks to the last verified healthy state with **1 single click**.
+
+---
+
+## 8. Document & Context Explorer (Folders, Zoom & Live Editor)
 
 Under **Documents & Context**:
 1. **Folder Categories**: Visual folders (*Architecture*, *Design & UX*, *Meetings & Notes*, *General Documentation*).
 2. **File Formats**:
-   - **Markdown (`.md`)**: Read documents or launch the **Live Collaborative Notion-style Editor** with real-time WebSocket presence.
+   - **Markdown (`.md`)**: Read documents or launch the **Live Collaborative Editor** with high-contrast rendering in both **Light and Dark themes**, blockquotes, and real-time WebSocket sync.
    - **PDF (`.pdf`) and Word (`.docx`)**: Direct preview and download links.
    - **Images (`.img`)**: Thumbnails with a **Zoom Viewer** featuring zoom-in, zoom-out, and reset controls.
 3. **Registering Files**: Click `+ New Document` to create notes or attach links to any folder.
 
 ---
 
-## 7. Room AI Assistant (GitBot)
+## 9. Room AI Assistant (GitBot)
 
 Click the floating **GitBot AI** button at the bottom-right:
 - Ask questions in natural language:

@@ -106,14 +106,55 @@ export default function DashboardView() {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="flex flex-wrap lg:flex-col gap-3 shrink-0">
+            {/* Quick Actions & Project Fast Navigation */}
+            <div className="flex flex-col gap-2 shrink-0 w-full lg:w-64">
               <Link
                 to="/projects/1?tab=kanban"
-                className="flex items-center justify-between gap-3 px-5 py-3 rounded-2xl bg-brand-cyan text-dark-950 font-bold text-xs hover:bg-cyan-300 transition-all shadow-md shadow-brand-cyan/20"
+                className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-brand-cyan text-dark-950 font-bold text-xs hover:bg-cyan-300 transition-all shadow-md shadow-brand-cyan/20"
               >
-                <span>Ir al Tablero Ágil</span>
+                <span className="flex items-center gap-2">
+                  <Layers className="w-4 h-4" />
+                  <span>Ir al Tablero Ágil</span>
+                </span>
                 <ChevronRight className="w-4 h-4" />
+              </Link>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  to="/projects/1?tab=review"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-700 dark:text-amber-400 font-bold text-[11px] transition-all"
+                  title="Acceso directo a la revisión previa y control de calidad"
+                >
+                  <span className="flex items-center gap-1.5 truncate">
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    <span>Control QA</span>
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+
+                <Link
+                  to="/projects/1?tab=documents"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-700 dark:text-brand-violet font-bold text-[11px] transition-all"
+                  title="Acceso directo a documentos y editor en vivo"
+                >
+                  <span className="flex items-center gap-1.5 truncate">
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span>Editor Vivo</span>
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <Link
+                to="/projects/1?tab=telemetry"
+                className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-100 dark:bg-dark-950 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-[11px] transition-all"
+                title="Acceso a telemetría de commits y motor de rollback"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5 text-cyan-600 dark:text-brand-cyan" />
+                  <span>Telemetría & Respaldo Rollback</span>
+                </span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>

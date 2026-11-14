@@ -653,6 +653,22 @@ function executeMockFallback(text, params) {
 
   // 12. UPDATE tasks SET status
   if (normalized.startsWith('update tasks set status')) {
+    // 12a. Bulk Rollback query: update tasks set status = 'in_progress', is_archived = false ... where project_id = $1 ...
+    if (normalized.includes("status = 'in_progress'") && normalized.includes('where project_id = $1')) {
+      const projectId = Number(params[0]);
+      let rolledBackCount = 0;
+      mockStore.tasks.forEach(t => {
+        if (t.project_id === projectId && (t.status === 'DONE' || t.is_archived)) {
+          t.status = 'IN_PROGRESS';
+          t.is_archived = false;
+          t.completed_at = null;
+          t.updated_at = new Date();
+          rolledBackCount++;
+        }
+      });
+      return { rows: [], rowCount: rolledBackCount };
+    }
+
     const taskId = Number(params[params.length - 1]);
     const nextStatus = params[0];
     const task = mockStore.tasks.find(t => t.id === taskId);
