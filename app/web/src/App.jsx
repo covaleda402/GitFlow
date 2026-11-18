@@ -19,8 +19,8 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardView />} />
               <Route path="/profile" element={<ProfileView />} />
               <Route path="/projects/:id" element={<ProjectView />} />
-              <Route path="/" element={<Navigate to="/projects/1" replace />} />
-              <Route path="*" element={<Navigate to="/projects/1" replace />} />
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </BrowserRouter>
         </SocketProvider>

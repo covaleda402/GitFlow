@@ -9,7 +9,7 @@ export default function LoginView() {
 
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [isAuthenticated, loading, navigate]);
 

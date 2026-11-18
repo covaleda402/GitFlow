@@ -192,29 +192,41 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
 
       {/* User Footer Profile & Logout */}
       <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <Link to="/profile" className="flex items-center gap-2.5 group overflow-hidden">
-          <img
-            src={user?.custom_avatar || user?.avatar_url || 'https://avatars.githubusercontent.com/u/10101?v=4'}
-            alt={user?.username || 'user'}
-            className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-700 object-cover shrink-0"
-          />
-          <div className="truncate">
-            <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-cyan-600 dark:group-hover:text-brand-cyan">
-              {user?.name || user?.username || 'Edwin Esquivel'}
-            </span>
-            <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
-              @{user?.username || 'edwin-esquivel'}
-            </span>
-          </div>
-        </Link>
+        {user ? (
+          <>
+            <Link to="/profile" className="flex items-center gap-2.5 group overflow-hidden">
+              <img
+                src={user?.custom_avatar || user?.avatar_url || 'https://avatars.githubusercontent.com/u/10101?v=4'}
+                alt={user?.username || 'user'}
+                className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-700 object-cover shrink-0"
+              />
+              <div className="truncate">
+                <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-cyan-600 dark:group-hover:text-brand-cyan">
+                  {user?.name || user?.username}
+                </span>
+                <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                  @{user?.username}
+                </span>
+              </div>
+            </Link>
 
-        <button
-          onClick={logout}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
-          title="Cerrar Sesión y salir"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
+            <button
+              onClick={logout}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
+              title="Cerrar Sesión y salir"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </>
+        ) : (
+          <Link
+            to="/login"
+            className="w-full py-2 px-3 rounded-xl bg-brand-cyan/15 hover:bg-brand-cyan/25 border border-brand-cyan/30 text-cyan-700 dark:text-brand-cyan text-xs font-bold flex items-center justify-center gap-2 transition-all"
+          >
+            <User className="w-4 h-4" />
+            <span>Iniciar Sesión</span>
+          </Link>
+        )}
       </div>
 
     </aside>

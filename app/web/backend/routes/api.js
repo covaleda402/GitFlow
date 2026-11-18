@@ -14,22 +14,36 @@ const router = express.Router();
  */
 router.get('/projects', optionalToken, async (req, res) => {
   try {
+    // OWASP A01: Broken Access Control Defense
+    // If user is not authenticated, DO NOT expose other users' rooms or repositories
+    if (!req.user) {
+      return res.json({ 
+        success: true, 
+        projects: [], 
+        isGuest: true,
+        message: 'Acceso privado. Inicia sesión para ver tus salas o únete ingresando un código temporal de 5 minutos.' 
+      });
+    }
+
+    const userId = req.user.id;
     const query = `
       SELECT p.id, p.name, p.description, p.github_repo, p.owner_id, 
              COALESCE(p.status, 'ACTIVE') AS status, p.deleted_at, p.created_at, p.updated_at,
              COUNT(DISTINCT t.id) AS total_tasks,
              COUNT(DISTINCT c.id) AS total_commits,
-             COUNT(DISTINCT m.id) AS total_members
+             COUNT(DISTINCT m_all.id) AS total_members
       FROM projects p
       LEFT JOIN tasks t ON t.project_id = p.id AND t.is_archived = false
       LEFT JOIN commits c ON c.project_id = p.id
-      LEFT JOIN project_members m ON m.project_id = p.id
-      WHERE p.status IS NULL OR p.status != 'DELETED'
+      LEFT JOIN project_members m_all ON m_all.project_id = p.id
+      LEFT JOIN project_members m_user ON m_user.project_id = p.id AND m_user.user_id = $1
+      WHERE (p.status IS NULL OR p.status != 'DELETED')
+        AND (p.owner_id = $1 OR m_user.user_id IS NOT NULL)
       GROUP BY p.id
       ORDER BY p.id ASC
     `;
-    const result = await db.query(query);
-    res.json({ success: true, projects: result.rows });
+    const result = await db.query(query, [userId]);
+    res.json({ success: true, projects: result.rows, isGuest: false });
   } catch (error) {
     console.error('[API Projects Error]:', error.message);
     res.status(500).json({ error: 'Error al obtener proyectos.' });

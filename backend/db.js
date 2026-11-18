@@ -480,7 +480,16 @@ function executeMockFallback(text, params) {
 
   // 6. SELECT projects for user (or all projects)
   if (normalized.includes('from projects') && !normalized.includes('where id = $1')) {
-    const projectsWithCounts = mockStore.projects.map(p => {
+    const userId = params[0] ? Number(params[0]) : null;
+    let list = mockStore.projects.filter(p => p.status !== 'DELETED');
+    if (userId) {
+      list = list.filter(p => {
+        const isOwner = Number(p.owner_id) === userId;
+        const isMember = mockStore.project_members.some(m => m.project_id === p.id && Number(m.user_id) === userId);
+        return isOwner || isMember;
+      });
+    }
+    const projectsWithCounts = list.map(p => {
       const taskCount = mockStore.tasks.filter(t => t.project_id === p.id && !t.is_archived).length;
       const commitCount = mockStore.commits.filter(c => c.project_id === p.id).length;
       const memberCount = mockStore.project_members.filter(m => m.project_id === p.id).length;

@@ -16,10 +16,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
  */
 router.get('/github', (req, res) => {
   if (!GITHUB_CLIENT_ID || GITHUB_CLIENT_ID === 'your_github_client_id_here') {
-    return res.status(400).json({
-      error: 'GitHub Client ID no configurado en el servidor.',
-      hint: 'Puedes usar el botón "Iniciar como Usuario Demo" para probar el sistema sin credenciales de GitHub.'
-    });
+    return res.redirect(`${FRONTEND_URL}/login?notice=github_oauth_unconfigured`);
   }
 
   const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
@@ -199,10 +196,28 @@ router.post('/demo-login', async (req, res) => {
       }
     };
 
+    // Fetch real GitHub public profile if available
+    let ghAvatar = null;
+    let ghName = null;
+    let ghBio = null;
+    try {
+      const ghRes = await axios.get(`https://api.github.com/users/${cleanUsername}`, {
+        headers: { 'User-Agent': 'GitFlow-Platform' },
+        timeout: 2500
+      });
+      if (ghRes.data) {
+        ghAvatar = ghRes.data.avatar_url;
+        ghName = ghRes.data.name;
+        ghBio = ghRes.data.bio;
+      }
+    } catch (e) {
+      // User not on GitHub or public rate limit, use resilient fallback
+    }
+
     const userProfile = knownUsers[cleanUsername] || {
-      name: customName || cleanUsername.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-      role: 'Full-Stack Developer',
-      avatar: customAvatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${cleanUsername}`
+      name: customName || ghName || cleanUsername.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+      role: ghBio || 'Full-Stack Developer',
+      avatar: customAvatar || ghAvatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${cleanUsername}`
     };
 
     // Look for user in db
