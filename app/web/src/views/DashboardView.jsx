@@ -298,7 +298,7 @@ export default function DashboardView() {
                     className="py-3 px-5 rounded-2xl bg-brand-cyan hover:bg-cyan-300 text-dark-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-brand-cyan/20"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>+ Crear Nueva Sala</span>
+                    <span>Crear Nueva Sala</span>
                   </button>
 
                   <button
@@ -352,7 +352,7 @@ export default function DashboardView() {
                     onClick={() => setIsCreateOpen(true)}
                     className="py-2 px-4 rounded-xl bg-brand-cyan hover:bg-cyan-300 text-dark-950 font-bold text-xs"
                   >
-                    + Crear Sala
+                    Crear Sala
                   </button>
                   <button
                     onClick={() => setIsJoinOpen(true)}

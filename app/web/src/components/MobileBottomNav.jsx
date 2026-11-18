@@ -38,19 +38,18 @@ export default function MobileBottomNav({ projectId = 1, onSimulatePush }) {
         <span className="text-[9px] sm:text-[10px] font-semibold tracking-tight truncate">QA / Rev</span>
       </Link>
 
-      {/* 3. Center Glowing Action: Simular Push */}
-      <button
-        onClick={onSimulatePush}
-        className="flex flex-col items-center -mt-4 sm:-mt-5 group shrink-0 px-1"
-        title="Simular Push de Git"
+      {/* 3. Documentos / Contexto */}
+      <Link
+        to={`/projects/${projectId}?tab=documents`}
+        className={`flex flex-col items-center gap-0.5 sm:gap-1 py-1 px-1.5 sm:px-2 rounded-xl transition-all min-w-0 ${
+          !isProfileActive && currentTab === 'documents'
+            ? 'text-cyan-600 dark:text-brand-cyan font-bold scale-105'
+            : 'text-slate-500 dark:text-slate-400'
+        }`}
       >
-        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-tr from-brand-cyan to-brand-violet p-0.5 shadow-lg shadow-brand-cyan/30 group-active:scale-95 transition-transform flex items-center justify-center">
-          <div className="w-full h-full rounded-full bg-dark-950 flex items-center justify-center">
-            <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-brand-cyan animate-pulse" />
-          </div>
-        </div>
-        <span className="text-[8px] sm:text-[9px] font-mono text-cyan-600 dark:text-brand-cyan mt-0.5 font-bold">Push</span>
-      </button>
+        <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+        <span className="text-[9px] sm:text-[10px] font-semibold tracking-tight truncate">Contexto</span>
+      </Link>
 
       {/* 4. Historial */}
       <Link
@@ -63,19 +62,6 @@ export default function MobileBottomNav({ projectId = 1, onSimulatePush }) {
       >
         <Archive className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
         <span className="text-[9px] sm:text-[10px] font-semibold tracking-tight truncate">Historial</span>
-      </Link>
-
-      {/* 5. Documentos / Contexto */}
-      <Link
-        to={`/projects/${projectId}?tab=documents`}
-        className={`flex flex-col items-center gap-0.5 sm:gap-1 py-1 px-1.5 sm:px-2 rounded-xl transition-all min-w-0 ${
-          !isProfileActive && currentTab === 'documents'
-            ? 'text-cyan-600 dark:text-brand-cyan font-bold scale-105'
-            : 'text-slate-500 dark:text-slate-400'
-        }`}
-      >
-        <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-        <span className="text-[9px] sm:text-[10px] font-semibold tracking-tight truncate">Contexto</span>
       </Link>
 
       {/* 6. Perfil */}

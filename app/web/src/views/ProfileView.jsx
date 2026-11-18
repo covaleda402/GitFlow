@@ -101,52 +101,97 @@ export default function ProfileView() {
   const [saving, setSaving] = useState(false);
   const [uploadingCloudinary, setUploadingCloudinary] = useState(false);
 
+  const compressImage = (file, maxWidth = 512, maxHeight = 512, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   const handleCloudinaryUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona un archivo de imagen válido (.png, .jpg, .webp).');
+    // Formatos permitidos: estrictamente PNG y JPG
+    const validMimes = ['image/png', 'image/jpeg', 'image/jpg'];
+    if (!validMimes.includes(file.type)) {
+      alert('Formato no permitido. Solo se aceptan archivos de imagen PNG y JPG.');
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      alert('La imagen no debe superar los 8MB.');
+    // Tamaño máximo permitido: 2MB
+    if (file.size > 2 * 1024 * 1024) {
+      alert('El archivo excede el tamaño máximo permitido de 2 MB.');
       return;
     }
 
     setUploadingCloudinary(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
+    try {
+      // Optimizar y comprimir antes de enviar para evitar errores 413 de Vercel
+      const compressedDataUrl = await compressImage(file, 512, 512, 0.85);
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          file: compressedDataUrl,
+          folder: 'avatars',
+          tag: 'user-profile'
+        })
+      });
+
+      const textResponse = await res.text();
+      let data = {};
       try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            file: reader.result,
-            folder: 'avatars',
-            tag: 'user-profile'
-          })
-        });
-
-        const data = await res.json();
-        if (res.ok && data.url) {
-          setSelectedAvatar(data.url);
-          setCustomAvatarInput(data.url);
-        } else {
-          alert(data.error || 'Error al subir imagen a Cloudinary.');
-        }
-      } catch (err) {
-        console.error('Error uploading to Cloudinary:', err);
-        alert('Error de conexión al subir la imagen.');
-      } finally {
-        setUploadingCloudinary(false);
+        data = JSON.parse(textResponse);
+      } catch (parseErr) {
+        throw new Error('Respuesta del servidor no válida al procesar imagen.');
       }
-    };
-    reader.readAsDataURL(file);
+
+      if (res.ok && data.url) {
+        setSelectedAvatar(data.url);
+        setCustomAvatarInput(data.url);
+      } else {
+        alert(data.error || 'Error al procesar la subida del ícono a Cloudinary.');
+      }
+    } catch (err) {
+      console.error('Error uploading to Cloudinary:', err);
+      alert('Error de conexión al subir el ícono: ' + err.message);
+    } finally {
+      setUploadingCloudinary(false);
+    }
   };
 
   // Modals for rooms
@@ -349,33 +394,33 @@ export default function ProfileView() {
                 </div>
               </div>
 
-              {/* Cloudinary Direct File Upload */}
+              {/* Cloudinary Icon File Upload */}
               <div className="p-3.5 rounded-2xl bg-cyan-500/5 dark:bg-cyan-500/10 border border-cyan-500/25 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <UploadCloud className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
                     <span className="text-xs font-semibold text-slate-900 dark:text-white">
-                      Subir Foto a Cloudinary:
+                      Subir ícono:
                     </span>
                   </div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-700 dark:text-brand-cyan font-bold">
-                    Cloudinary CDN
+                    PNG / JPG
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-brand-cyan border border-brand-cyan/40 text-xs font-mono font-medium transition-all shadow-sm">
                     <UploadCloud className="w-3.5 h-3.5" />
-                    <span>{uploadingCloudinary ? 'Subiendo a Cloudinary...' : 'Elegir Archivo Local'}</span>
+                    <span>{uploadingCloudinary ? 'Subiendo ícono...' : 'Elegir ícono (.png, .jpg)'}</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png, image/jpeg, image/jpg"
                       disabled={uploadingCloudinary}
                       onChange={handleCloudinaryUpload}
                       className="hidden"
                     />
                   </label>
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    PNG, JPG, WEBP (hasta 8MB)
+                    Solo PNG o JPG (máx. 2 MB, recomendado 400x400 px)
                   </span>
                 </div>
               </div>

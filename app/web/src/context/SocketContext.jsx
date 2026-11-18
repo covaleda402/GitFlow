@@ -11,13 +11,21 @@ export function SocketProvider({ children }) {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    // Connect to server (either via current host or VITE_SOCKET_URL)
+    // Detect if running on Vercel Serverless (which doesn't host persistent WebSockets)
+    const isVercel = typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app');
+
+    if (isVercel && !import.meta.env.VITE_SOCKET_URL) {
+      console.log('[Socket] Serverless mode active on Vercel. Telemetría y eventos locales gestionados.');
+      setIsConnected(true);
+      return;
+    }
+
     const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
     const socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000
+      transports: ['polling', 'websocket'],
+      reconnectionAttempts: 3,
+      reconnectionDelay: 2000
     });
 
     socketRef.current = socket;
@@ -28,7 +36,10 @@ export function SocketProvider({ children }) {
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('[Socket] Disconnected:', reason);
+      setIsConnected(false);
+    });
+
+    socket.on('connect_error', () => {
       setIsConnected(false);
     });
 
