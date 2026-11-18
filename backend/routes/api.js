@@ -10,12 +10,13 @@ const router = express.Router();
 
 /**
  * GET /api/projects
- * Lists all projects/rooms accessible
+ * Lists all active projects/rooms accessible (filters out permanently deleted rooms)
  */
 router.get('/projects', optionalToken, async (req, res) => {
   try {
     const query = `
-      SELECT p.id, p.name, p.description, p.github_repo, p.owner_id, p.created_at, p.updated_at,
+      SELECT p.id, p.name, p.description, p.github_repo, p.owner_id, 
+             COALESCE(p.status, 'ACTIVE') AS status, p.deleted_at, p.created_at, p.updated_at,
              COUNT(DISTINCT t.id) AS total_tasks,
              COUNT(DISTINCT c.id) AS total_commits,
              COUNT(DISTINCT m.id) AS total_members
@@ -23,6 +24,7 @@ router.get('/projects', optionalToken, async (req, res) => {
       LEFT JOIN tasks t ON t.project_id = p.id AND t.is_archived = false
       LEFT JOIN commits c ON c.project_id = p.id
       LEFT JOIN project_members m ON m.project_id = p.id
+      WHERE p.status IS NULL OR p.status != 'DELETED'
       GROUP BY p.id
       ORDER BY p.id ASC
     `;
@@ -123,6 +125,101 @@ router.get('/projects/:id', optionalToken, async (req, res) => {
   } catch (error) {
     console.error('[API Project Detail Error]:', error.message);
     res.status(500).json({ error: 'Error al consultar sala.' });
+  }
+});
+
+/**
+ * PATCH /api/projects/:id/status
+ * Updates room status: 'ACTIVE', 'SUSPENDED', 'DELETED'
+ * Preserves all completed task history in user profiles!
+ */
+router.patch('/projects/:id/status', optionalToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+    const { status } = req.body;
+
+    const allowed = ['ACTIVE', 'SUSPENDED', 'DELETED'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: `Estado inválido: ${status}. Permitidos: ACTIVE, SUSPENDED, DELETED.` });
+    }
+
+    const updateQuery = `
+      UPDATE projects 
+      SET status = $1, 
+          deleted_at = CASE WHEN $1 = 'DELETED' THEN CURRENT_TIMESTAMP ELSE NULL END,
+          updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $2 
+      RETURNING *
+    `;
+    const result = await db.query(updateQuery, [status, projectId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    const updatedProject = result.rows[0];
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(`project_${projectId}`).emit('project_status_changed', {
+        projectId,
+        status: updatedProject.status,
+        deleted_at: updatedProject.deleted_at
+      });
+    }
+
+    res.json({
+      success: true,
+      message: status === 'DELETED' 
+        ? 'Sala eliminada definitivamente. El historial de tareas se conserva intacto en los perfiles.'
+        : `Estado de la sala actualizado a: ${status}`,
+      project: updatedProject
+    });
+  } catch (error) {
+    console.error('[API Project Status Error]:', error.message);
+    res.status(500).json({ error: 'Error al cambiar estado de la sala.' });
+  }
+});
+
+/**
+ * DELETE /api/projects/:id
+ * Permanently soft-deletes a room, preserving all tasks and history in user profiles
+ */
+router.delete('/projects/:id', optionalToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+
+    const updateQuery = `
+      UPDATE projects 
+      SET status = 'DELETED', 
+          deleted_at = CURRENT_TIMESTAMP, 
+          updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $1 
+      RETURNING *
+    `;
+    const result = await db.query(updateQuery, [projectId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(`project_${projectId}`).emit('project_status_changed', {
+        projectId,
+        status: 'DELETED',
+        deleted_at: new Date()
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Sala eliminada definitivamente. Todo el historial de tareas completadas se conserva en los perfiles de los usuarios.',
+      project: result.rows[0]
+    });
+  } catch (error) {
+    console.error('[API Delete Project Error]:', error.message);
+    res.status(500).json({ error: 'Error al eliminar la sala.' });
   }
 });
 
@@ -456,9 +553,11 @@ router.get('/projects/:id/history', optionalToken, async (req, res) => {
     if (isOwner || !userId) {
       query = `
         SELECT t.*, u.username as assigned_username, u.name as assigned_name,
-               COALESCE(u.custom_avatar, u.avatar_url) as assigned_avatar_url
+               COALESCE(u.custom_avatar, u.avatar_url) as assigned_avatar_url,
+               p.name as project_name, COALESCE(p.status, 'ACTIVE') as project_status
         FROM tasks t
         LEFT JOIN users u ON u.id = t.assigned_to_user_id
+        LEFT JOIN projects p ON p.id = t.project_id
         WHERE t.project_id = $1 AND (t.status = 'DONE' OR t.is_archived = true)
         ORDER BY t.completed_at DESC NULLS LAST
       `;
@@ -466,9 +565,11 @@ router.get('/projects/:id/history', optionalToken, async (req, res) => {
     } else {
       query = `
         SELECT t.*, u.username as assigned_username, u.name as assigned_name,
-               COALESCE(u.custom_avatar, u.avatar_url) as assigned_avatar_url
+               COALESCE(u.custom_avatar, u.avatar_url) as assigned_avatar_url,
+               p.name as project_name, COALESCE(p.status, 'ACTIVE') as project_status
         FROM tasks t
         LEFT JOIN users u ON u.id = t.assigned_to_user_id
+        LEFT JOIN projects p ON p.id = t.project_id
         WHERE t.project_id = $1 AND (t.status = 'DONE' OR t.is_archived = true) AND t.assigned_to_user_id = $2
         ORDER BY t.completed_at DESC NULLS LAST
       `;
@@ -621,11 +722,11 @@ router.get('/users/profile/me', authenticateToken, async (req, res) => {
     }
     const userProfile = userRes.rows[0];
 
-    // Personal completed tasks
+    // Personal completed tasks (preserves tasks even if the room is deleted or suspended)
     const completedTasksRes = await db.query(`
-      SELECT t.*, p.name as project_name 
+      SELECT t.*, p.name as project_name, COALESCE(p.status, 'ACTIVE') as project_status 
       FROM tasks t
-      JOIN projects p ON p.id = t.project_id
+      LEFT JOIN projects p ON p.id = t.project_id
       WHERE t.assigned_to_user_id = $1 AND (t.status = 'DONE' OR t.is_archived = true)
       ORDER BY t.completed_at DESC NULLS LAST
     `, [userId]);

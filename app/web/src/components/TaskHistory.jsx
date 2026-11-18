@@ -148,6 +148,16 @@ export default function TaskHistory({ projectId = 1 }) {
                         Finalizada
                       </span>
                       {getPriorityBadge(task.priority)}
+                      {task.project_status === 'DELETED' && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold">
+                          Sala eliminada
+                        </span>
+                      )}
+                      {task.project_status === 'SUSPENDED' && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold">
+                          Sala suspendida
+                        </span>
+                      )}
                       <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 line-through decoration-emerald-500/60 truncate max-w-md">
                         {task.title}
                       </h4>

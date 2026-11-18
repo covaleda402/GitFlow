@@ -43,6 +43,8 @@ CREATE TABLE projects (
     context_markdown TEXT DEFAULT '# Contexto del Proyecto\n\nDocumenta aquí las decisiones técnicas, arquitectura y requerimientos.',
     owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     room_seed VARCHAR(50) DEFAULT 'GF-SECURE',
+    status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED', 'DELETED')),
+    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

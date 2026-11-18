@@ -42,6 +42,13 @@ Welcome to the official user guide for **GitFlow** (RepoSync / GitPulse). This p
 2. Enter the 6-character code provided by the room creator (e.g. `7A9F1B`).
 3. Click **Enter Room**. You will join as a **Member**.
 
+### 3.3 Suspending or Deleting a Room (History Preservation)
+If you are the room owner/administrator:
+1. At the top of the project view, you will find room administration actions: **"Suspender Sala"** (Suspend) and **"Eliminar Definitiva"** (Permanent Delete).
+2. **Suspend**: Pauses ongoing activity, preventing new task creation while displaying a warning badge.
+3. **Delete**: Soft-deletes the room from active listings without data destruction.
+4. **Guaranteed History Preservation**: **Your completed tasks will never be deleted**. In **My Profile (`/profile`)**, every task you completed in deleted or suspended rooms remains permanently preserved in your personal history, displaying the badge `"Sala eliminada"` or `"Sala suspendida"` below its title.
+
 > ⏱️ **5-Minute Rotation Security**:  
 > Every room generates a dynamic security code that rotates every 5 minutes. The sidebar provides a countdown timer, progress bar, and 1-click copy button.
 

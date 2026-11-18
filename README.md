@@ -10,7 +10,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon_Serverless-4169E1?logo=postgresql&logoColor=white)](https://neon.tech)
 [![Cloudinary](https://img.shields.io/badge/Cloudinary-Media_CDN-3448C5?logo=cloudinary&logoColor=white)](https://cloudinary.com)
 [![OWASP](https://img.shields.io/badge/Security-OWASP_Top_10-008080?logo=shield&logoColor=white)](https://owasp.org)
-[![Coverage](https://img.shields.io/badge/Coverage-70.0%25_Passing-success?logo=jest&logoColor=white)](https://nodejs.org)
+[![Coverage](https://img.shields.io/badge/Coverage-70.7%25_Passing-success?logo=jest&logoColor=white)](https://nodejs.org)
 [![Socket.io](https://img.shields.io/badge/WebSockets-Socket.io_4.8-010101?logo=socket.io&logoColor=white)](https://socket.io)
 [![Vercel](https://img.shields.io/badge/Deploy-Vercel_Ready-000000?logo=vercel&logoColor=white)](https://vercel.com)
 
@@ -20,9 +20,10 @@
 
 **GitFlow** transforma la gestión de proyectos de software convirtiendo el código fuente en el motor reactivo del flujo de trabajo:
 
-1. **Salas de Trabajo Seguras con Código Dinámico (Rotación de 5 Minutos)**:
-   - Cualquier desarrollador puede crear salas de proyectos independientes.
-   - Acceso seguro mediante **códigos temporales de 6 caracteres que rotan automáticamente cada 5 minutos**, evitando accesos no autorizados.
+1. **Salas de Trabajo Seguras con Código Dinámico y Ciclo de Vida**:
+   - Creación y administración de salas independientes con **códigos temporales de 6 caracteres que rotan automáticamente cada 5 minutos**.
+   - **Suspensión y Eliminación Definitiva de Salas**: Los administradores pueden suspender temporalmente una sala o eliminarla definitivamente.
+   - **Preservación Total del Historial**: Al eliminar o suspender una sala, **las tareas completadas nunca se pierden**; se conservan permanentemente en el perfil del desarrollador (`/profile`) y en el historial general, luciendo la insignia `"Sala eliminada"` o `"Sala suspendida"`.
 2. **Privacidad de Tareas y Panel de Vista Personal**:
    - **Vista de Creador (Admin)**: Supervisión completa del avance global de todo el equipo, conmutador rápido entre *Todo el Equipo* y *Mis Tareas*, y filtros dinámicos por miembro.
    - **Vista Personal de Miembros**: Tablero filtrado enfocado exclusivamente en sus **tareas personales asignadas**, garantizando foco y privacidad.
@@ -86,15 +87,16 @@ npm run test
 npm run test:coverage
 ```
 
-### Métricas de Cobertura Obtenidas:
+### Métricas de Cobertura Obtenidas (22 Pruebas Automatizadas):
 | Componente | Cobertura de Líneas | Cobertura de Ramas | Cobertura de Funciones | Estado |
 |---|---|---|---|---|
 | **Seguridad OWASP & Criptografía (TOTP)** | 100.00% | 100.00% | 100.00% | ✅ Aprobado |
-| **Autenticación & JWT** | 92.59% | 78.57% | 100.00% | ✅ Aprobado |
+| **Autenticación, JWT & Perfiles** | 92.59% | 78.57% | 100.00% | ✅ Aprobado |
 | **Control de Calidad (QA Pre-Review)** | 100.00% | 100.00% | 100.00% | ✅ Aprobado |
-| **Motor de Respaldo y Rollback** | 100.00% | 100.00% | 100.00% | ✅ Aprobado |
-| **Cloudinary Media Service** | 81.94% | 71.43% | 100.00% | ✅ Aprobado |
-| **Total Global del Sistema** | **70.01%** | **74.67%** | **88.64%** | 🏆 **>70% Superado** |
+| **Motor de Respaldo y Rollback** | 92.86% | 75.00% | 100.00% | ✅ Aprobado |
+| **Cloudinary Media Service & CDN** | 81.94% | 71.43% | 100.00% | ✅ Aprobado |
+| **Tareas, Instrucciones & Ciclo de Salas** | 97.10% | 83.33% | 100.00% | ✅ Aprobado |
+| **Total Global del Sistema** | **70.66%** | **72.15%** | **88.89%** | 🏆 **>70% Superado (22/22 Tests)** |
 
 ---
 

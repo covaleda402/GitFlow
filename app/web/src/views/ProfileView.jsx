@@ -55,14 +55,48 @@ const INITIAL_PROFILE = {
 
 export default function ProfileView() {
   const { user, token } = useAuth();
-  const [profileData, setProfileData] = useState(INITIAL_PROFILE);
+  const [profileData, setProfileData] = useState(() => ({
+    id: user?.id || 1,
+    username: user?.username || 'edwin-esquivel',
+    name: user?.name || user?.username || 'Edwin Esquivel',
+    email: user?.email || (user?.username ? `${user.username}@gitflow.dev` : 'edwin@omnicode.tech'),
+    bio: user?.bio || 'Lead Full-Stack Developer & DevOps en GitFlow. Especialista en microservicios, WebSockets y telemetría de código.',
+    avatar_url: user?.avatar_url || 'https://avatars.githubusercontent.com/u/10101?v=4',
+    custom_avatar: user?.custom_avatar || user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+    stats: {
+      completedTasksCount: 5,
+      commitsCount: 14,
+      impactScore: 265
+    },
+    completedTasks: INITIAL_PROFILE.completedTasks,
+    recentCommits: INITIAL_PROFILE.recentCommits
+  }));
   const [loading, setLoading] = useState(false);
+
+  // Synchronize profile data with authenticated user immediately
+  useEffect(() => {
+    if (user) {
+      setProfileData(prev => ({
+        ...prev,
+        id: user.id || prev.id,
+        username: user.username || prev.username,
+        name: user.name || user.username || prev.name,
+        email: user.email || `${user.username}@gitflow.dev`,
+        bio: user.bio !== undefined ? user.bio : prev.bio,
+        avatar_url: user.avatar_url || prev.avatar_url,
+        custom_avatar: user.custom_avatar || user.avatar_url || prev.custom_avatar
+      }));
+      setName(user.name || user.username || '');
+      setBio(user.bio || '');
+      setSelectedAvatar(user.custom_avatar || user.avatar_url || '');
+    }
+  }, [user]);
 
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(INITIAL_PROFILE.name);
-  const [bio, setBio] = useState(INITIAL_PROFILE.bio);
-  const [selectedAvatar, setSelectedAvatar] = useState(INITIAL_PROFILE.custom_avatar);
+  const [name, setName] = useState(user?.name || user?.username || INITIAL_PROFILE.name);
+  const [bio, setBio] = useState(user?.bio || INITIAL_PROFILE.bio);
+  const [selectedAvatar, setSelectedAvatar] = useState(user?.custom_avatar || user?.avatar_url || INITIAL_PROFILE.custom_avatar);
   const [customAvatarInput, setCustomAvatarInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingCloudinary, setUploadingCloudinary] = useState(false);
@@ -430,7 +464,21 @@ export default function ProfileView() {
                     <h5 className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-through decoration-emerald-500/50">
                       {task.title}
                     </h5>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Sala: {task.project_name}</span>
+                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                        Sala: {task.project_name || `#${task.project_id}`}
+                      </span>
+                      {task.project_status === 'DELETED' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[9px] font-mono font-bold">
+                          Sala eliminada
+                        </span>
+                      )}
+                      {task.project_status === 'SUSPENDED' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[9px] font-mono font-bold">
+                          Sala suspendida
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400 shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-dark-950 px-2.5 py-1 rounded-xl">

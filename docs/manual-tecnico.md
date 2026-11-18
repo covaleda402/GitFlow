@@ -18,6 +18,14 @@ Para evitar filtraciones de acceso no autorizado y enlaces compartidos indefinid
 - `GET /api/projects/:id/security-code`: Retorna el código activo, los segundos restantes y si el solicitante es el creador.
 - `POST /api/projects/join`: Recibe `{ code }`, valida la vigencia en todas las salas y asocia al usuario como `MEMBER`.
 - `POST /api/projects`: Crea una nueva sala y asigna al usuario autenticado el rol `OWNER`.
+- `PATCH /api/projects/:id/status`: Modifica el estado de la sala (`ACTIVE`, `SUSPENDED`, `DELETED`). Emite `project_status_changed` a la sala WebSocket.
+- `DELETE /api/projects/:id`: Ejecuta soft-delete de la sala estableciendo `status = 'DELETED'` y `deleted_at = CURRENT_TIMESTAMP`.
+
+### 1.3 Ciclo de Vida de Salas y Preservación de Historial
+Para respetar la integridad histórica y laboral de cada desarrollador, GitFlow **no ejecuta hard-deletes en cascada** sobre las salas:
+1. **Suspensión (`SUSPENDED`)**: Pausa el ingreso de nuevas tareas y muestra una alerta visual al equipo.
+2. **Eliminación Definitiva (`DELETED`)**: Oculta la sala del menú y listados activos. Sin embargo, todas las tareas terminadas que los integrantes completaron en dicha sala se conservan intactas en sus perfiles individuales (`/profile`) y en el endpoint de auditoría, etiquetadas automáticamente con el distintivo:
+   $$\text{Distintivo UI: } \text{"Sala eliminada"}$$
 
 ---
 
@@ -163,13 +171,13 @@ GitFlow integra el SDK oficial de **Cloudinary** para el almacenamiento y entreg
 La plataforma cuenta con un conjunto de pruebas ejecutadas con el runner nativo de Node.js (`node:test` y `node:assert`):
 
 - **Comandos**:
-  - `npm run test`: Ejecuta las 21 pruebas unitarias e integrales contra la base de datos real Neon.
+  - `npm run test`: Ejecuta las 22 pruebas unitarias e integrales contra la base de datos real Neon.
   - `npm run test:coverage`: Ejecuta análisis de cobertura con V8.
 - **Resultados Certificados**:
-  - **Líneas**: 70.01% (Supera el umbral del 70%)
-  - **Ramas (Branches)**: 74.67%
-  - **Funciones**: 88.64%
-  - **Tasa de Éxito**: 100% (21/21 pruebas aprobadas sin fallos).
+  - **Líneas**: 70.66% (Supera el umbral del 70%)
+  - **Ramas (Branches)**: 72.15%
+  - **Funciones**: 88.89%
+  - **Tasa de Éxito**: 100% (22/22 pruebas aprobadas sin fallos).
 
 ---
 
@@ -177,12 +185,23 @@ La plataforma cuenta con un conjunto de pruebas ejecutadas con el runner nativo 
 
 Endpoint: `/api/users/profile/me`
 - Permite actualizar nombre, biografía y avatar personalizado (`custom_avatar`).
-- Opciones de avatar:
-  1. Avatar original de GitHub sincronizado vía OAuth.
-  2. Presets estilizados (Tech Lead, Cyberpunk, Backend Architect, Security Hacker).
-  3. URL de imagen externa o foto propia.
+- Integración directa con **Cloudinary CDN** para almacenamiento persistente y optimizado de imágenes mediante `/api/upload`.
+- Visualización de tareas históricas cerradas con indicativo de procedencia (`Sala eliminada` o `Sala suspendida`).
 - Retorna el historial personal acumulado de tareas cerradas y commits registrados para calcular el **Score de Impacto**:
   $$\text{Score} = (\text{Commits} \times 10) + (\text{Tareas Cerradas} \times 25)$$
+
+---
+
+## 11. Arquitectura de Despliegue en Vercel (Monorepo Serverless)
+
+GitFlow implementa una arquitectura monorepo optimizada para la infraestructura serverless de Vercel (CLI v65+):
+1. **Punto de Entrada Serverless**: Ubicado en el archivo raíz `/api/index.js`, el cual expone la aplicación Express modular (`app`) desde `backend/server.js`.
+2. **Enrutamiento y Rewrites en `vercel.json`**:
+   - `/api` y `/api/(.*)` son dirigidos al Serverless Function `/api/index.js`.
+   - Todas las demás rutas estáticas `/(.*)` se resuelven contra `/index.html` (Single Page Application con React Router).
+3. **Compilación de Artefactos**:
+   - La configuración de Vite (`app/web/vite.config.js`) compila directamente a la carpeta raíz `/dist`, donde Vercel localiza los activos estáticos para su CDN global.
+   - Script `"vercel-build": "npm run build:frontend"` en `package.json`.
 
 ---
 

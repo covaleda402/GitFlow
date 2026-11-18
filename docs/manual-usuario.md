@@ -42,6 +42,13 @@ Bienvenido a la guía oficial de usuario de **GitFlow**. Esta plataforma unifica
 2. Ingresa el código de 6 caracteres que te proporcione el creador de la sala (ej. `7A9F1B`).
 3. Pulsa **Entrar a la Sala**. Ingresarás automáticamente con el rol de **Miembro**.
 
+### 3.3 Suspender o Eliminar una Sala (Preservación del Historial)
+Si eres el creador/administrador de una sala:
+1. En la cabecera del proyecto verás los controles **"Suspender Sala"** y **"Eliminar Definitiva"**.
+2. **Suspender**: Pausa temporalmente el trabajo en la sala. Los miembros verán un aviso de advertencia y las tareas quedarán congeladas hasta su reanudación.
+3. **Eliminar Definitiva**: Realiza una baja segura (soft-delete). La sala desaparece de la lista activa.
+4. **Preservación Total del Historial Personal**: **Tus tareas completadas nunca se borrarán**. Al visitar **Mi Perfil (`/profile`)**, todas las tareas que hayas terminado en dicha sala seguirán visibles en tu historial de trabajo, luciendo la insignia `"Sala eliminada"` o `"Sala suspendida"` debajo del título.
+
 > ⏱️ **Seguridad con Rotación de 5 Minutos**:  
 > Cada sala genera un código temporal que rota automáticamente cada 5 minutos. En el Sidebar puedes ver el código actual, los segundos restantes y un botón de **1 clic para copiarlo**.
 

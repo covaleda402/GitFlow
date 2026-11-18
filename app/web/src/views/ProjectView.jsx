@@ -26,7 +26,11 @@ import {
   Users,
   Bot,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  PauseCircle,
+  PlayCircle,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function ProjectView() {
@@ -83,6 +87,53 @@ export default function ProjectView() {
     }
   };
 
+  const handleToggleSuspend = async () => {
+    const isCurrentlySuspended = project?.status === 'SUSPENDED';
+    const newStatus = isCurrentlySuspended ? 'ACTIVE' : 'SUSPENDED';
+    const confirmMsg = isCurrentlySuspended
+      ? '¿Deseas reanudar las operaciones normales de esta sala?'
+      : '¿Deseas suspender temporalmente esta sala? Los miembros no podrán agregar nuevas tareas mientras esté suspendida.';
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProject(prev => ({ ...prev, status: newStatus }));
+      } else {
+        alert(data.error || 'Error al actualizar estado de la sala.');
+      }
+    } catch (e) {
+      alert('Error de conexión.');
+    }
+  };
+
+  const handleDeleteRoom = async () => {
+    const confirmDelete = window.confirm(
+      '¿Estás seguro de eliminar definitivamente esta sala? El historial de tareas completadas se conservará intacto en los perfiles de los usuarios y aparecerá identificado como "Sala eliminada".'
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProject(prev => ({ ...prev, status: 'DELETED' }));
+        alert('Sala eliminada definitivamente. Todo el historial se conserva intacto en los perfiles.');
+      } else {
+        alert(data.error || 'Error al eliminar la sala.');
+      }
+    } catch (e) {
+      alert('Error de conexión al eliminar sala.');
+    }
+  };
+
   const tabs = [
     { id: 'kanban', label: 'Tablero Ágil', icon: Layers },
     { id: 'review', label: 'Revisión Previa (QA)', icon: ShieldCheck },
@@ -129,6 +180,20 @@ export default function ProjectView() {
             
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3 flex-wrap">
               <span>{project ? project.name : 'GitFlow Ecosystem'}</span>
+
+              {project?.status === 'SUSPENDED' && (
+                <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Sala Suspendida
+                </span>
+              )}
+              {project?.status === 'DELETED' && (
+                <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Sala Eliminada
+                </span>
+              )}
+
               <a
                 href={`https://github.com/${project ? project.github_repo : 'edwin-esquivel-ADSO/GitFlow'}`}
                 target="_blank"
@@ -142,13 +207,72 @@ export default function ProjectView() {
             </h1>
           </div>
 
-          {/* Collaborators online badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-card text-xs font-mono text-slate-700 dark:text-slate-300 self-start sm:self-auto border border-slate-200 dark:border-slate-800">
-            <Users className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
-            <span>Colaboradores en sala:</span>
-            <span className="font-bold text-cyan-600 dark:text-brand-cyan">{onlineUsers.length || 1}</span>
+          {/* Right Header Actions: Online Badge + Suspend / Delete Room Controls */}
+          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            {/* Collaborators online badge */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-card text-xs font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
+              <Users className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
+              <span>En sala:</span>
+              <span className="font-bold text-cyan-600 dark:text-brand-cyan">{onlineUsers.length || 1}</span>
+            </div>
+
+            {/* Room Management Controls */}
+            {project?.status !== 'DELETED' && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleToggleSuspend}
+                  title={project?.status === 'SUSPENDED' ? 'Reanudar Sala' : 'Suspender Sala temporalmente'}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-mono font-medium border transition-all ${
+                    project?.status === 'SUSPENDED'
+                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                      : 'bg-slate-100 dark:bg-dark-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-amber-500'
+                  }`}
+                >
+                  {project?.status === 'SUSPENDED' ? <PlayCircle className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
+                  <span>{project?.status === 'SUSPENDED' ? 'Reanudar' : 'Suspender'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteRoom}
+                  title="Eliminar sala definitiva manteniendo el historial de perfiles"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-mono font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar Definitiva</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Room Status Alert Banners */}
+        {project?.status === 'SUSPENDED' && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between gap-4 font-sans animate-fade-in">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
+              <span>
+                <strong>Atención:</strong> Esta sala se encuentra suspendida temporalmente por el administrador. Las tareas y el historial permanecen en modo solo lectura.
+              </span>
+            </div>
+            <button
+              onClick={handleToggleSuspend}
+              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-semibold shrink-0 transition-all"
+            >
+              Reanudar Sala
+            </button>
+          </div>
+        )}
+
+        {project?.status === 'DELETED' && (
+          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-3 font-sans animate-fade-in">
+            <Trash2 className="w-4 h-4 shrink-0 text-rose-500" />
+            <span>
+              <strong>Sala Eliminada:</strong> Esta sala ha sido eliminada definitivamente del catálogo activo. El historial de tareas completadas se encuentra preservado y protegido en los perfiles de los usuarios con la insignia <em>"Sala eliminada"</em>.
+            </span>
+          </div>
+        )}
 
         {/* Tab Switcher Bar */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">

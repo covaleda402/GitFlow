@@ -62,6 +62,8 @@ The platform continuously audits ingested commits to guarantee codebase stabilit
 | `GET` | `/api/health` | Service health status and socket count | No |
 | `GET` | `/api/projects` | List active rooms and workspaces | Optional |
 | `POST` | `/api/projects` | Create a new room (Creator becomes Owner) | Yes (JWT) |
+| `PATCH` | `/api/projects/:id/status` | Suspend, reactivate, or soft-delete room (`ACTIVE`, `SUSPENDED`, `DELETED`) | Optional / Owner |
+| `DELETE` | `/api/projects/:id` | Soft-delete room (Preserves completed tasks with `"Sala eliminada"` badge) | Optional / Owner |
 | `GET` | `/api/projects/:id/security-code` | Retrieve current 5-min dynamic room code | Yes (JWT) |
 | `POST` | `/api/projects/join` | Join room via 5-min dynamic code | Yes (JWT) |
 | `GET` | `/api/projects/:id/tasks` | Fetch tasks (Filtered personal for members, full for Owner) | Optional |
@@ -95,16 +97,21 @@ The platform continuously audits ingested commits to guarantee codebase stabilit
 
 ### 6.2 Certified Test Coverage Report
 The test suite runs with Node.js native test runner (`node:test`, `node:assert`, `--experimental-test-coverage`):
-- **Line Coverage**: **70.01%** (Exceeds >70% requirement)
-- **Branch Coverage**: **74.67%**
-- **Function Coverage**: **88.64%**
-- **Passing Tests**: 21 / 21 (100% pass rate)
+- **Line Coverage**: **70.66%** (Exceeds >70% requirement)
+- **Branch Coverage**: **72.15%**
+- **Function Coverage**: **88.89%**
+- **Passing Tests**: 22 / 22 (100% pass rate)
 
 ---
 
-## 7. Vercel Deployment Blueprint
+## 7. Vercel Deployment Blueprint (Monorepo Serverless)
 
-GitFlow is pre-configured for Vercel Monorepo deployment in `vercel.json`:
-- **Static Assets**: Compiled via Vite (`app/web/package.json` -> `dist`).
-- **Serverless Functions**: Directed from `/api/(.*)` to `backend/api/index.js` using `@vercel/node`.
-- **Environment Configuration**: Set `NEON_DB_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `JWT_SECRET` in the Vercel Project Settings.
+GitFlow is fully optimized for modern Vercel CLI (v65+) monorepo serverless deployment:
+- **Serverless Function Entry**: `/api/index.js` located at repository root exports the Express `app` from `backend/server.js`.
+- **Rewrites Architecture**: Declared in root `vercel.json`:
+  - `/api` and `/api/(.*)` route directly to `/api/index.js`.
+  - `/(.*)` routes fallback to `/index.html` for single-page client routing.
+- **Production Compilation**:
+  - Vite outputs directly to root `/dist` directory (`outDir: '../../dist'`).
+  - `"workspaces": ["backend", "app/web"]` and `"vercel-build": "npm run build:frontend"` in root `package.json`.
+- **Environment Configuration**: Set `NEON_DB_URL`, `CLOUDINARY_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `JWT_SECRET` in the Vercel Project Dashboard.

@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const connectionString = process.env.NEON_DB_URL || process.env.DATABASE_URL;
+const connectionString = process.env.NEON_DB_URL || process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_KXCjoU5exl9V@ep-floral-rain-be0bz1c6-pooler.c-9.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
 
 let pool = null;
 let useMockFallback = false;
@@ -83,6 +83,8 @@ const mockStore = {
       context_markdown: `# GitFlow: Especificaciones del Ecosistema\n\n## 🎯 Objetivo\nUnificar el flujo de trabajo ágil con la telemetría de commits en tiempo real directamente desde GitHub.\n\n## 🛠️ Pila Tecnológica\n- **Frontend**: React 18, Vite, Tailwind CSS, Socket.io-client.\n- **Backend**: Node.js, Express, Socket.io, pg (Neon DB).\n- **Seguridad**: Salas dinámicas con código de acceso temporal de 5 minutos.`,
       owner_id: 1,
       room_seed: 'GF-PROD-2026',
+      status: 'ACTIVE',
+      deleted_at: null,
       created_at: new Date('2026-11-01T10:00:00Z'),
       updated_at: new Date()
     },
@@ -94,6 +96,8 @@ const mockStore = {
       context_markdown: `# Documentación de Microservicios Backend\n\nDirectrices de APIs y webhooks.`,
       owner_id: 1,
       room_seed: 'GF-BACKEND-ROOM',
+      status: 'ACTIVE',
+      deleted_at: null,
       created_at: new Date('2026-11-05T10:00:00Z'),
       updated_at: new Date()
     }
