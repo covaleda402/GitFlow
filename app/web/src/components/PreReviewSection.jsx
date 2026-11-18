@@ -36,11 +36,9 @@ export default function PreReviewSection({ projectId = 1, onSwitchToKanban, onSw
 
   const fetchTasks = async () => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/tasks`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/projects/${projectId}/tasks`, { headers });
       const data = await res.json();
       if (data.success) {
         setTasks(data.tasks);
@@ -111,12 +109,12 @@ export default function PreReviewSection({ projectId = 1, onSwitchToKanban, onSw
     setActionLoading(prev => ({ ...prev, [task.id]: 'approving' }));
     try {
       const note = reviewNotes[task.id] || 'Aprobado en Control de Calidad (QA) tras verificación exitosa.';
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`/api/tasks/${task.id}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
           status: 'DONE',
           completion_notes: note
@@ -153,12 +151,12 @@ export default function PreReviewSection({ projectId = 1, onSwitchToKanban, onSw
 
     setActionLoading(prev => ({ ...prev, [task.id]: 'rejecting' }));
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`/api/tasks/${task.id}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
           status: 'IN_PROGRESS',
           completion_notes: feedback ? `Ajustes solicitados: ${feedback.trim()}` : null

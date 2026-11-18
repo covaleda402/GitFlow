@@ -8,12 +8,56 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const authRoutes = require('./routes/auth');
 const webhookRoutes = require('./routes/webhooks');
 const apiRoutes = require('./routes/api');
+const uploadRoutes = require('./routes/upload');
 
 const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+// -----------------------------------------------------------------------------
+// OWASP SECURITY HEADERS & DEFENSES
+// -----------------------------------------------------------------------------
+app.disable('x-powered-by');
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Lightweight rate limiting middleware (OWASP A04 & A07)
+const rateLimitMap = new Map();
+function rateLimiter(limit = 60, windowMs = 60000) {
+  return (req, res, next) => {
+    // Skip rate limiter in test mode
+    if (process.env.NODE_ENV === 'test') return next();
+
+    const ip = req.ip || req.connection.remoteAddress || '127.0.0.1';
+    const key = `${ip}_${req.baseUrl || req.path}`;
+    const now = Date.now();
+    const clientData = rateLimitMap.get(key) || { count: 0, resetTime: now + windowMs };
+
+    if (now > clientData.resetTime) {
+      clientData.count = 1;
+      clientData.resetTime = now + windowMs;
+    } else {
+      clientData.count += 1;
+    }
+
+    rateLimitMap.set(key, clientData);
+
+    if (clientData.count > limit) {
+      return res.status(429).json({
+        error: 'Demasiadas solicitudes. Por favor intenta más tarde (Protección OWASP Rate Limiting).'
+      });
+    }
+    next();
+  };
+}
 
 // -----------------------------------------------------------------------------
 // CORS CONFIGURATION
@@ -127,7 +171,8 @@ io.on('connection', (socket) => {
 // -----------------------------------------------------------------------------
 // ROUTE REGISTRATION
 // -----------------------------------------------------------------------------
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', rateLimiter(60, 60000), authRoutes);
+app.use('/api/upload', rateLimiter(30, 60000), uploadRoutes);
 app.use('/api/webhook', webhookRoutes);
 app.use('/api', apiRoutes);
 

@@ -61,6 +61,17 @@ const mockStore = {
       email: 'alex.rivera@omnicode.tech',
       bio: 'Frontend & UX Specialist',
       created_at: new Date('2026-11-03T12:00:00Z')
+    },
+    {
+      id: 4,
+      github_id: '40404',
+      username: 'covaleda402',
+      name: 'Jose Esneider Covaleda',
+      avatar_url: 'https://avatars.githubusercontent.com/u/108304918?v=4',
+      custom_avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80',
+      email: 'covaleda402@omnicode.tech',
+      bio: 'Full-Stack Developer & Quality Assurance',
+      created_at: new Date('2026-11-04T10:00:00Z')
     }
   ],
   projects: [

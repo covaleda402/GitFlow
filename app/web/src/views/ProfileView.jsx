@@ -16,7 +16,8 @@ import {
   Calendar, 
   Github, 
   ShieldCheck, 
-  Clock 
+  Clock,
+  UploadCloud 
 } from 'lucide-react';
 
 const AVATAR_PRESETS = [
@@ -64,6 +65,55 @@ export default function ProfileView() {
   const [selectedAvatar, setSelectedAvatar] = useState(INITIAL_PROFILE.custom_avatar);
   const [customAvatarInput, setCustomAvatarInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingCloudinary, setUploadingCloudinary] = useState(false);
+
+  const handleCloudinaryUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona un archivo de imagen válido (.png, .jpg, .webp).');
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      alert('La imagen no debe superar los 8MB.');
+      return;
+    }
+
+    setUploadingCloudinary(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            file: reader.result,
+            folder: 'avatars',
+            tag: 'user-profile'
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.url) {
+          setSelectedAvatar(data.url);
+          setCustomAvatarInput(data.url);
+        } else {
+          alert(data.error || 'Error al subir imagen a Cloudinary.');
+        }
+      } catch (err) {
+        console.error('Error uploading to Cloudinary:', err);
+        alert('Error de conexión al subir la imagen.');
+      } finally {
+        setUploadingCloudinary(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Modals for rooms
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -262,6 +312,37 @@ export default function ProfileView() {
                       <span className="block text-[9px] font-mono mt-1 text-center text-slate-600 dark:text-slate-400 truncate max-w-[50px]">{p.name}</span>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Cloudinary Direct File Upload */}
+              <div className="p-3.5 rounded-2xl bg-cyan-500/5 dark:bg-cyan-500/10 border border-cyan-500/25 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UploadCloud className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
+                    <span className="text-xs font-semibold text-slate-900 dark:text-white">
+                      Subir Foto a Cloudinary:
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-700 dark:text-brand-cyan font-bold">
+                    Cloudinary CDN
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-brand-cyan border border-brand-cyan/40 text-xs font-mono font-medium transition-all shadow-sm">
+                    <UploadCloud className="w-3.5 h-3.5" />
+                    <span>{uploadingCloudinary ? 'Subiendo a Cloudinary...' : 'Elegir Archivo Local'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingCloudinary}
+                      onChange={handleCloudinaryUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    PNG, JPG, WEBP (hasta 8MB)
+                  </span>
                 </div>
               </div>
 

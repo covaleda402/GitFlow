@@ -141,7 +141,8 @@ CREATE INDEX idx_project_docs_folder ON project_documents(folder_name);
 INSERT INTO users (id, github_id, username, name, avatar_url, custom_avatar, email, bio) VALUES
 (1, '10101', 'edwin-esquivel', 'Edwin Esquivel', 'https://avatars.githubusercontent.com/u/10101?v=4', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80', 'edwin@omnicode.tech', 'Lead Full-Stack Developer & DevOps'),
 (2, '20202', 'maria-dev', 'Maria Gomez', 'https://avatars.githubusercontent.com/u/20202?v=4', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80', 'maria.gomez@omnicode.tech', 'Backend & Telemetry Engineer'),
-(3, '30303', 'alex-coder', 'Alex Rivera', 'https://avatars.githubusercontent.com/u/30303?v=4', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80', 'alex.rivera@omnicode.tech', 'Frontend & UX Specialist');
+(3, '30303', 'alex-coder', 'Alex Rivera', 'https://avatars.githubusercontent.com/u/30303?v=4', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80', 'alex.rivera@omnicode.tech', 'Frontend & UX Specialist'),
+(4, '40404', 'covaleda402', 'Jose Esneider Covaleda', 'https://avatars.githubusercontent.com/u/108304918?v=4', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80', 'covaleda402@omnicode.tech', 'Full-Stack Developer & Quality Assurance');
 
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 

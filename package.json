@@ -10,6 +10,8 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build:frontend": "npm run build --prefix app/web",
     "build": "npm run build:frontend",
+    "test": "npm run test --prefix backend",
+    "test:coverage": "npm run test:coverage --prefix backend",
     "start": "npm start --prefix backend"
   },
   "devDependencies": {

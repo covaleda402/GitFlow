@@ -4,17 +4,22 @@ Bienvenido a la guía oficial de usuario de **GitFlow**. Esta plataforma unifica
 
 ---
 
-## 1. Inicio de Sesión y Acceso
+## 1. Inicio de Sesión y Acceso Multiusuario
 
 1. Abre tu navegador e ingresa a la plataforma (`http://localhost:5173` en local o tu URL en Vercel).
 2. Verás la pantalla de inicio de sesión con dos modalidades:
-   - **Iniciar sesión con GitHub**: Te autentica con tu cuenta real de GitHub, importando tu avatar, usuario y repositorios.
-   - **Entrar en Modo Demo**: Te permite ingresar inmediatamente con un perfil de prueba preconfigurado (*Edwin Esquivel, Maria Gomez, Alex Rivera*) sin necesidad de claves externas.
+   - **Iniciar sesión con GitHub OAuth**: Te autentica con tu cuenta real de GitHub, importando tu avatar, usuario y repositorios.
+   - **Ingreso Instantáneo como Desarrollador**:
+     - **Pestaña Equipo GitFlow**: Selector directo de integrantes del equipo (*Jose Esneider Covaleda, Edwin Esquivel, Maria Gomez, Alex Rivera*), permitiendo que cada miembro del equipo acceda con su propia identidad y avatar.
+     - **Pestaña Tu Cuenta Propia**: Te permite ingresar tu propio handle de usuario (ej. `covaleda402`, `tu-nombre`) y nombre completo, creando tu sesión personalizada con JWT y Prepared Statements en Neon DB.
 
 ---
 
-## 2. Navegación en Pantalla
+## 2. Navegación en Pantalla y Selector de Temas (Claro y Oscuro)
 
+* **Selector de Temas (Sol / Luna)**:
+  - Ubicado en la barra lateral (Desktop) y en la barra superior (Móvil).
+  - Permite alternar instantáneamente entre el **Tema Oscuro Tech** y el **Tema Claro de Alto Contraste**, garantizando que los textos, tarjetas, modales y botones mantengan contraste óptimo sin forzar vistas ni causar parpadeos.
 * **En Computadora (PC / Desktop)**:
   - Dispones de una **barra lateral izquierda fija (Sidebar)**.
   - En la parte superior encuentras el selector de sala activa, botones para crear o unirte a salas, el **código dinámico de 5 minutos**, y el botón de alternar entre **Modo Claro y Modo Oscuro**.
@@ -127,8 +132,10 @@ En la pestaña **Telemetría**:
 
 ---
 
-## 9. Mi Perfil
+## 10. Mi Perfil & Subida de Avatares a Cloudinary
 
 En la sección **Mi Perfil**:
-- Puedes personalizar tu avatar eligiendo entre tu foto de GitHub, avatares temáticos (*Tech Lead, Cyberpunk, Hacker*) o ingresando cualquier URL de imagen.
-- Consulta tus estadísticas personales: tareas completadas, commits realizados y tu **Score de Impacto Total**.
+- **Subida Directa a Cloudinary**: Utiliza el botón **"Elegir Archivo Local"** para cargar cualquier imagen personal (PNG, JPG, WEBP hasta 8MB) directamente a la nube CDN de Cloudinary.
+- **Selector de Avatares**: Alterna entre tu foto original de GitHub, avatares temáticos preconfigurados (*Tech Lead, Cyberpunk, Backend Architect, Security Hacker*) o ingresa una URL personalizada.
+- **Información del Desarrollador**: Edita tu nombre y biografía en tiempo real.
+- **Estadísticas Personales**: Revisa tus tareas completadas, commits registrados y tu **Score de Impacto Total** acumulado.

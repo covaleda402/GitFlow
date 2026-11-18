@@ -61,13 +61,17 @@ export function AuthProvider({ children }) {
   };
 
   // Instant Demo Login (without GitHub App keys)
-  const loginDemo = async (username = 'edwin-esquivel') => {
+  const loginDemo = async (username = 'edwin-esquivel', customName = null, customAvatar = null) => {
     setLoading(true);
     try {
       const response = await fetch('/api/auth/demo-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
+        body: JSON.stringify({ 
+          username, 
+          name: customName, 
+          avatar_url: customAvatar 
+        })
       });
 
       const data = await response.json();

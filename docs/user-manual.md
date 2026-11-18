@@ -4,17 +4,22 @@ Welcome to the official user guide for **GitFlow** (RepoSync / GitPulse). This p
 
 ---
 
-## 1. Authentication & Sign In
+## 1. Authentication & Multi-User Sign In
 
 1. Open your browser and navigate to the application (`http://localhost:5173` locally or your production Vercel URL).
 2. Choose your preferred access method:
-   - **Sign in with GitHub**: Authenticates with your real GitHub credentials, extracting your avatar, handle, and repositories.
-   - **Enter in Demo Mode**: Instantly launches with preloaded profiles (*Edwin Esquivel, Maria Gomez, Alex Rivera*) for immediate evaluation without external keys.
+   - **Sign in with GitHub OAuth**: Authenticates with your real GitHub credentials, extracting your avatar, handle, and repositories.
+   - **Instant Developer Access**:
+     - **GitFlow Team Tab**: Direct profile selector for teammates (*Jose Esneider Covaleda, Edwin Esquivel, Maria Gomez, Alex Rivera*), enabling each collaborator to enter with their own identity and avatar.
+     - **Custom Account Tab**: Allows typing any custom developer handle (e.g. `covaleda402`, `your-name`) and full display name to enter with a dedicated session and prepared SQL record.
 
 ---
 
-## 2. Platform Navigation
+## 2. Platform Navigation & Dark/Light Theme Switching
 
+* **Theme Switcher (Sun / Moon)**:
+  - Accessible from the Left Sidebar (Desktop) and Mobile Top Bar.
+  - Toggles seamlessly between **Tech Dark Theme** and **High-Contrast Light Theme**, ensuring crisp typography, clear borders, and optimal readability without forced viewports or screen flicker.
 * **Desktop Layout (Left Sidebar)**:
   - Fixed vertical navigation docked on the left.
   - Room switcher, room creation and joining buttons, dynamic 5-minute code widget, and Dark/Light theme toggle.
@@ -125,8 +130,10 @@ In the **Telemetry** section:
 
 ---
 
-## 9. Developer Profile & Customization
+## 10. Developer Profile & Cloudinary CDN Uploads
 
 Under **My Profile**:
-- Customize your avatar using GitHub, curated presets (*Tech Lead, Cyberpunk, Hacker*), or custom image URLs.
-- Track personal career metrics: completed tasks, synchronized commits, and Total Impact Score.
+- **Direct Cloudinary CDN Upload**: Use the **"Elegir Archivo Local"** button to upload local image files (PNG, JPG, WEBP up to 8MB) directly to Cloudinary media storage.
+- **Avatar Selector**: Switch between your GitHub profile photo, themed presets (*Tech Lead, Cyberpunk, Hacker*), or custom image URLs.
+- **Developer Details**: Edit your display name and technical bio in real time.
+- **Career Metrics**: Track personal metrics: completed tasks, synchronized commits, and Total Impact Score.

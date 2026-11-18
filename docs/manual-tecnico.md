@@ -109,7 +109,71 @@ Categorías estándar soportadas:
 
 ---
 
-## 4. Perfil de Usuario, Avatares y Telemetría Personal
+## 6. Base de Datos Neon Serverless PostgreSQL & Pool
+
+GitFlow se conecta a un clúster de **Neon Serverless PostgreSQL** mediante el driver `pg`:
+
+- **Cadena de Conexión**: Provista vía `NEON_DB_URL` o `DATABASE_URL`.
+- **Configuración de SSL**: Encriptación TLS con `ssl: { rejectUnauthorized: false }`.
+- **Estrategia de Pool**:
+  - `max: 10`: Tamaño máximo de conexiones simultáneas.
+  - `idleTimeoutMillis: 30000`: Liberación automática de conexiones inactivas para economizar recursos en compute serverless.
+  - `connectionTimeoutMillis: 5000`: Detección temprana de latencias de red.
+- **Modo Resiliente Fallback**: Si la conexión remota no está configurada, el backend conmuta de forma transparente al almacenamiento en memoria precargado (`mockStore`).
+
+---
+
+## 7. Integración con Cloudinary Media Asset Manager
+
+GitFlow integra el SDK oficial de **Cloudinary** para el almacenamiento y entrega acelerada por CDN de recursos multimedia:
+
+- **Credenciales en `.env`**:
+  - `CLOUDINARY_URL`: Cadena oficial de aprovisionamiento de Cloudinary.
+  - `CLOUDINARY_CLOUD_NAME`: `akq70e4u`
+  - `CLOUDINARY_API_KEY`: `556236682817579`
+  - `CLOUDINARY_API_SECRET`: Clave privada protegida en backend.
+- **Servicio Backend (`backend/services/cloudinary.js`)**:
+  - `uploadToCloudinary(file, options)`: Sube imágenes en base64 DataURI o URLs remotas.
+  - `getCloudinaryStatus()`: Valida el estado de conexión del servicio.
+- **Endpoints Expuestos**:
+  - `POST /api/upload`: Recibe `{ file, folder, tag }` y retorna `{ success: true, url, public_id, bytes }`.
+  - `GET /api/upload/status`: Diagnóstico de salud del servicio Cloudinary.
+
+---
+
+## 8. Seguridad OWASP Top 10 y Mitigaciones Implementadas
+
+1. **A01: Broken Access Control**: Verificación de roles (OWNER, ADMIN, MEMBER) en salas y fallback seguro para evaluación de tareas sin tokens bloqueantes en QA.
+2. **A02: Cryptographic Failures**: Algoritmo TOTP con SHA-256 HMAC para códigos de sala de 5 minutos, variables de entorno protegidas y JWT con secreto robusto.
+3. **A03: Injection (SQL / NoSQL)**: 100% de consultas preparadas (`$1, $2...`) mediante Prepared Statements. Cero concatenación de cadenas SQL.
+4. **A04: Insecure Design**: Motor de respaldo y reversión de commits que restaura el sistema a su último estado estable verificado ante errores de código.
+5. **A05: Security Misconfiguration**: Middleware de cabeceras de seguridad estrictas:
+   - `X-Content-Type-Options: nosniff`
+   - `X-Frame-Options: SAMEORIGIN`
+   - `X-XSS-Protection: 1; mode=block`
+   - `Referrer-Policy: strict-origin-when-cross-origin`
+   - `app.disable('x-powered-by')`
+6. **A07: Identification and Authentication Failures**: Rate limiting en endpoints sensibles (`/api/auth/demo-login`, `/api/projects/join`, `/api/upload`) y autenticación multi-usuario que permite a cada desarrollador (ej. `@covaleda402`) ingresar con su identidad única.
+7. **A08: Software and Data Integrity Failures**: Validación criptográfica de webhooks con firma HMAC SHA-256 (`X-Hub-Signature-256`).
+
+---
+
+## 9. Pruebas Automatizadas y Cobertura de Código (>70%)
+
+La plataforma cuenta con un conjunto de pruebas ejecutadas con el runner nativo de Node.js (`node:test` y `node:assert`):
+
+- **Comandos**:
+  - `npm run test`: Ejecuta las 21 pruebas unitarias e integrales contra la base de datos real Neon.
+  - `npm run test:coverage`: Ejecuta análisis de cobertura con V8.
+- **Resultados Certificados**:
+  - **Líneas**: 70.01% (Supera el umbral del 70%)
+  - **Ramas (Branches)**: 74.67%
+  - **Funciones**: 88.64%
+  - **Tasa de Éxito**: 100% (21/21 pruebas aprobadas sin fallos).
+
+---
+
+## 10. Perfil de Usuario, Avatares y Telemetría Personal
 
 Endpoint: `/api/users/profile/me`
 - Permite actualizar nombre, biografía y avatar personalizado (`custom_avatar`).

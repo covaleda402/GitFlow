@@ -170,28 +170,69 @@ router.get('/me', authenticateToken, async (req, res) => {
  */
 router.post('/demo-login', async (req, res) => {
   try {
-    const { username = 'edwin-esquivel' } = req.body;
+    const { username = 'edwin-esquivel', name: customName, avatar_url: customAvatar } = req.body;
+
+    // Sanitize username
+    const cleanUsername = String(username).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'developer';
+
+    // Map known teammates
+    const knownUsers = {
+      'edwin-esquivel': { 
+        name: 'Edwin Esquivel', 
+        role: 'Lead Full-Stack Developer & DevOps', 
+        avatar: 'https://avatars.githubusercontent.com/u/10101?v=4' 
+      },
+      'covaleda402': { 
+        name: 'Jose Esneider Covaleda', 
+        role: 'Full-Stack Developer & Quality Assurance', 
+        avatar: 'https://avatars.githubusercontent.com/u/108304918?v=4' 
+      },
+      'maria-dev': { 
+        name: 'Maria Gomez', 
+        role: 'Backend & Telemetry Engineer', 
+        avatar: 'https://avatars.githubusercontent.com/u/20202?v=4' 
+      },
+      'alex-coder': { 
+        name: 'Alex Rivera', 
+        role: 'Frontend & UX Specialist', 
+        avatar: 'https://avatars.githubusercontent.com/u/30303?v=4' 
+      }
+    };
+
+    const userProfile = knownUsers[cleanUsername] || {
+      name: customName || cleanUsername.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+      role: 'Full-Stack Developer',
+      avatar: customAvatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${cleanUsername}`
+    };
 
     // Look for user in db
-    let userResult = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+    let userResult = await db.query('SELECT * FROM users WHERE username = $1', [cleanUsername]);
 
     let user;
     if (userResult.rows.length === 0) {
       const insertQuery = `
-        INSERT INTO users (github_id, username, name, avatar_url, email)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, github_id, username, name, avatar_url, email
+        INSERT INTO users (github_id, username, name, avatar_url, email, bio)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, github_id, username, name, avatar_url, email, bio
       `;
       const insertRes = await db.query(insertQuery, [
-        'demo_' + Date.now(),
-        username,
-        'Edwin Esquivel (Demo)',
-        'https://avatars.githubusercontent.com/u/10101?v=4',
-        `${username}@omnicode.tech`
+        'demo_' + cleanUsername + '_' + Date.now().toString(36),
+        cleanUsername,
+        customName || userProfile.name,
+        customAvatar || userProfile.avatar,
+        `${cleanUsername}@omnicode.tech`,
+        userProfile.role
       ]);
       user = insertRes.rows[0];
     } else {
       user = userResult.rows[0];
+      if (customName && customName !== user.name) {
+        const updateRes = await db.query(
+          'UPDATE users SET name = $1 WHERE id = $2 RETURNING id, github_id, username, name, avatar_url, email',
+          [customName, user.id]
+        );
+        if (updateRes.rows.length > 0) user = updateRes.rows[0];
+      }
     }
 
     const payload = {
@@ -199,7 +240,7 @@ router.post('/demo-login', async (req, res) => {
       github_id: user.github_id,
       username: user.username,
       name: user.name,
-      avatar_url: user.avatar_url,
+      avatar_url: user.custom_avatar || user.avatar_url,
       email: user.email
     };
 

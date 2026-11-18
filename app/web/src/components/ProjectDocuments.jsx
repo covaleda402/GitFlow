@@ -16,7 +16,8 @@ import {
   Maximize2,
   Calendar,
   User,
-  Search
+  Search,
+  UploadCloud
 } from 'lucide-react';
 
 const INITIAL_DOCS = [
@@ -111,6 +112,49 @@ export default function ProjectDocuments({ projectId = 1 }) {
   const [newUrl, setNewUrl] = useState('');
   const [newContent, setNewContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingCloudinary, setUploadingCloudinary] = useState(false);
+
+  const handleCloudinaryDocUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('El archivo no debe superar los 10MB.');
+      return;
+    }
+
+    setUploadingCloudinary(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            file: reader.result,
+            folder: 'documents',
+            tag: newType
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.url) {
+          setNewUrl(data.url);
+        } else {
+          alert(data.error || 'Error al subir archivo a Cloudinary.');
+        }
+      } catch (err) {
+        console.error('Error uploading file to Cloudinary:', err);
+        alert('Error de conexión al subir el archivo.');
+      } finally {
+        setUploadingCloudinary(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const loadDocuments = async () => {
     try {
@@ -568,16 +612,39 @@ export default function ProjectDocuments({ projectId = 1 }) {
                   />
                 </div>
               ) : (
-                <div>
-                  <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">URL del Archivo o Imagen:</label>
-                  <input
-                    type="url"
-                    value={newUrl}
-                    onChange={(e) => setNewUrl(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-mono"
-                    placeholder="https://images.unsplash.com/..."
-                    required
-                  />
+                <div className="space-y-3">
+                  {/* Cloudinary direct upload option */}
+                  <div className="p-3 rounded-xl bg-cyan-500/5 dark:bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <UploadCloud className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        Subir a Cloudinary:
+                      </span>
+                    </div>
+                    <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-800 text-brand-cyan border border-brand-cyan/40 text-[11px] font-mono hover:bg-slate-800 transition-all">
+                      <span>{uploadingCloudinary ? 'Subiendo...' : 'Examinar'}</span>
+                      <input
+                        type="file"
+                        disabled={uploadingCloudinary}
+                        onChange={handleCloudinaryDocUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">
+                      O URL directa del archivo / imagen:
+                    </label>
+                    <input
+                      type="url"
+                      value={newUrl}
+                      onChange={(e) => setNewUrl(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-mono"
+                      placeholder="https://images.unsplash.com/... o enlace de Cloudinary"
+                      required
+                    />
+                  </div>
                 </div>
               )}
 

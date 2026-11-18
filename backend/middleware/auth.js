@@ -7,8 +7,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'gitflow_super_secret_jwt_key_2026_
  * Protects internal REST API routes.
  */
 function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
+  const authHeader = req.headers && req.headers['authorization'];
+  const token = (authHeader && authHeader.split(' ')[1]) || (req.query && req.query.token);
 
   if (!token) {
     return res.status(401).json({
@@ -32,8 +32,8 @@ function authenticateToken(req, res, next) {
  * Optional authentication: if token is present, populates req.user, but does not block.
  */
 function optionalToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
+  const authHeader = req.headers && req.headers['authorization'];
+  const token = (authHeader && authHeader.split(' ')[1]) || (req.query && req.query.token);
 
   if (!token) {
     return next();

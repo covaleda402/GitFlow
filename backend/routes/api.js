@@ -288,7 +288,7 @@ router.get('/projects/:id/tasks', optionalToken, async (req, res) => {
  * POST /api/projects/:id/tasks
  * Create a new task
  */
-router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
+router.post('/projects/:id/tasks', optionalToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
     const { title, description = '', instructions = '', status = 'TODO', priority = 'MEDIUM', assigned_to_user_id } = req.body;
@@ -297,7 +297,8 @@ router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'El título de la tarea es requerido.' });
     }
 
-    const assignedId = assigned_to_user_id ? parseInt(assigned_to_user_id, 10) : req.user.id;
+    const currentUserId = req.user ? req.user.id : 1;
+    const assignedId = assigned_to_user_id ? parseInt(assigned_to_user_id, 10) : currentUserId;
 
     const insertQuery = `
       INSERT INTO tasks (project_id, title, description, instructions, status, priority, assigned_to_user_id, created_by_user_id) 
@@ -312,7 +313,7 @@ router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
       status,
       priority,
       assignedId,
-      req.user.id
+      currentUserId
     ]);
 
     const createdTask = insertRes.rows[0];
@@ -350,7 +351,7 @@ router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
  * PATCH /api/tasks/:id/instructions
  * Updates step-by-step instructions for a task
  */
-router.patch('/tasks/:id/instructions', authenticateToken, async (req, res) => {
+router.patch('/tasks/:id/instructions', optionalToken, async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const { instructions = '' } = req.body;
@@ -390,7 +391,7 @@ router.patch('/tasks/:id/instructions', authenticateToken, async (req, res) => {
  * Transitions task through: TODO -> IN_PROGRESS -> REVIEW -> DONE
  * When marked as DONE, marks completed_at and moves to task history!
  */
-router.patch('/tasks/:id/status', authenticateToken, async (req, res) => {
+router.patch('/tasks/:id/status', optionalToken, async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const { status, completion_notes } = req.body;

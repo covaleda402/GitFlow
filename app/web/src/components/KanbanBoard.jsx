@@ -190,27 +190,31 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
     if (!editingInstructionsTask) return;
 
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`/api/tasks/${editingInstructionsTask.id}/instructions`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
           instructions: editingInstructionsTask.instructions
         })
       });
 
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.success) {
         setTasks(prev => prev.map(t => 
           t.id === editingInstructionsTask.id 
             ? { ...t, instructions: editingInstructionsTask.instructions } 
             : t
         ));
         setEditingInstructionsTask(null);
+      } else {
+        alert(data.error || 'Error al guardar las instrucciones.');
       }
     } catch (err) {
       console.error('Error saving instructions:', err);
+      alert('Error de conexión al guardar las instrucciones.');
     }
   };
 
