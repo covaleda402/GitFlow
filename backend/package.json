@@ -1,6 +1,7 @@
 {
   "name": "gitflow-backend",
   "version": "1.0.0",
+  "type": "commonjs",
   "description": "GitFlow Real-Time Telemetry and Agile Management Backend",
   "main": "server.js",
   "scripts": {
