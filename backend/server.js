@@ -169,15 +169,22 @@ io.on('connection', (socket) => {
 });
 
 // -----------------------------------------------------------------------------
-// ROUTE REGISTRATION
+// ROUTE REGISTRATION (Dual mount with and without /api for 100% serverless proxy compatibility)
 // -----------------------------------------------------------------------------
 app.use('/api/auth', rateLimiter(60, 60000), authRoutes);
+app.use('/auth', rateLimiter(60, 60000), authRoutes);
+
 app.use('/api/upload', rateLimiter(30, 60000), uploadRoutes);
+app.use('/upload', rateLimiter(30, 60000), uploadRoutes);
+
 app.use('/api/webhook', webhookRoutes);
+app.use('/webhook', webhookRoutes);
+
 app.use('/api', apiRoutes);
+app.use('/', apiRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.json({
     status: 'ONLINE',
     service: 'GitFlow Telemetry & Agile Hub',
@@ -188,7 +195,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Root fallback / welcome
-app.get('/', (req, res) => {
+app.get(['/', '/api'], (req, res) => {
   res.json({
     name: 'GitFlow API Server',
     description: 'Gestor ágil y telemetría de código en tiempo real',
