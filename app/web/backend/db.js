@@ -304,7 +304,7 @@ const mockStore = {
       id: 1,
       project_id: 1,
       folder_name: 'Arquitectura',
-      title: 'Diagrama de Flujo y Microservicios v2.0',
+      title: 'Diagrama de Flujo y Microservicios',
       file_type: 'md',
       file_url: '',
       content_markdown: '# Arquitectura del Ecosistema GitFlow\n\n## Servicios Principales:\n1. Ingestion de Webhooks con Regex Parser.\n2. Conexiones Socket.io con salas por proyecto.\n3. Base de Datos Neon PostgreSQL protegida con Prepared Statements.',
@@ -436,10 +436,21 @@ function executeMockFallback(text, params) {
     return { rows: user ? [user] : [], rowCount: user ? 1 : 0 };
   }
 
+  // 1b. SELECT users BY username
+  if (normalized.includes('from users where username = $1')) {
+    const user = mockStore.users.find(u => u.username.toLowerCase() === String(params[0]).toLowerCase());
+    return { rows: user ? [user] : [], rowCount: user ? 1 : 0 };
+  }
+
   // 2. SELECT users BY id
   if (normalized.includes('from users where id = $1')) {
     const user = mockStore.users.find(u => Number(u.id) === Number(params[0]));
     return { rows: user ? [user] : [], rowCount: user ? 1 : 0 };
+  }
+
+  // 3a. SELECT count(*) FROM users
+  if (normalized.includes('count(*)') && normalized.includes('from users')) {
+    return { rows: [{ count: String(mockStore.users.length) }], rowCount: 1 };
   }
 
   // 3. SELECT users ALL
@@ -693,6 +704,38 @@ function executeMockFallback(text, params) {
       return { rows: [], rowCount: rolledBackCount };
     }
 
+    // 12b. UPDATE tasks SET status = 'DONE' with completion_notes
+    if (normalized.includes("status = 'done'")) {
+      const completionNotes = params[0];
+      const taskId = Number(params[1]);
+      const task = mockStore.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.status = 'DONE';
+        task.completion_notes = completionNotes;
+        task.is_archived = true;
+        task.completed_at = new Date();
+        task.updated_at = new Date();
+        return { rows: [task], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }
+
+    // 12c. UPDATE tasks SET status = 'IN_PROGRESS' with completion_notes (QA Reject)
+    if (normalized.includes("status = 'in_progress'") && normalized.includes('completion_notes')) {
+      const completionNotes = params[0];
+      const taskId = Number(params[1]);
+      const task = mockStore.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.status = 'IN_PROGRESS';
+        task.completion_notes = completionNotes;
+        task.is_archived = false;
+        task.completed_at = null;
+        task.updated_at = new Date();
+        return { rows: [task], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }
+
     const taskId = Number(params[params.length - 1]);
     const nextStatus = params[0];
     const task = mockStore.tasks.find(t => t.id === taskId);
@@ -768,7 +811,23 @@ function executeMockFallback(text, params) {
     return { rows: [newCommit], rowCount: 1 };
   }
 
-  // 14b. UPDATE projects set github_repo
+  // 14b. UPDATE projects set status
+  if (normalized.startsWith('update projects set status')) {
+    const newStatus = params[0];
+    const projectId = Number(params[1]);
+    const project = mockStore.projects.find(p => p.id === projectId);
+    if (project) {
+      project.status = newStatus;
+      if (normalized.includes('deleted_at')) {
+        project.deleted_at = new Date();
+      }
+      project.updated_at = new Date();
+      return { rows: [project], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  // 14c. UPDATE projects set github_repo
   if (normalized.startsWith('update projects set github_repo')) {
     const newRepo = params[0];
     const projectId = Number(params[1]);

@@ -59,6 +59,7 @@ export default function ProjectView() {
   const [isAddRepoOpen, setIsAddRepoOpen] = useState(false);
   const [newRepoInput, setNewRepoInput] = useState('');
   const [addingRepo, setAddingRepo] = useState(false);
+  const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
 
   // Sub-tab in Documents: 'repository' (folders) | 'live-editor' (markdown writer)
   const [docSubTab, setDocSubTab] = useState('repository');
@@ -266,12 +267,29 @@ export default function ProjectView() {
         {/* Project Header Banner & Connected Repos */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1">
+            <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1 flex-wrap">
               <span>Salas</span>
               <span>/</span>
               <span className="text-cyan-700 dark:text-brand-cyan font-bold">{project ? project.name : 'GitFlow Ecosystem'}</span>
               <span>•</span>
-              <span>{project?.members?.length || 1} Miembros</span>
+              <button
+                type="button"
+                onClick={() => setIsMembersModalOpen(true)}
+                className="hover:text-cyan-600 dark:hover:text-brand-cyan underline cursor-pointer flex items-center gap-1 font-semibold transition-colors"
+                title="Ver lista de miembros y accesos de la sala"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>{project?.members?.length || 1} Miembros</span>
+              </button>
+              {project?.owner_username && (
+                <>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-bold bg-amber-500/15 px-2 py-0.5 rounded-lg border border-amber-500/30 text-[11px]">
+                    <span>👑</span>
+                    <span>Líder: @{project.owner_username}</span>
+                  </span>
+                </>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -329,9 +347,20 @@ export default function ProjectView() {
 
           {/* Right Header Actions: Online Badge + Suspend / Delete Room Controls */}
           <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            {/* Members List Modal Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setIsMembersModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-dark-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 text-xs font-mono font-medium transition-all shadow-xs"
+              title="Ver lista de miembros y roles de la sala"
+            >
+              <Users className="w-3.5 h-3.5 text-cyan-600 dark:text-brand-cyan" />
+              <span>Miembros ({project?.members?.length || 1})</span>
+            </button>
+
             {/* Collaborators online badge */}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-card text-xs font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
-              <Users className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>En sala:</span>
               <span className="font-bold text-cyan-600 dark:text-brand-cyan">{onlineUsers.length || 1}</span>
             </div>
@@ -620,6 +649,134 @@ export default function ProjectView() {
                 <span>Unirse con PIN</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Miembros de la Sala Modal */}
+      {isMembersModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in font-sans">
+          <div className="glass-panel w-full max-w-lg p-5 sm:p-6 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900 max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-brand-cyan border border-cyan-500/30 flex items-center justify-center">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Miembros de la Sala
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    Auditoría de acceso y roles en {project?.name || 'GitFlow'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMembersModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Members List */}
+            <div className="my-4 space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
+              {(project?.members && project.members.length > 0 ? project.members : [
+                {
+                  id: 1,
+                  user_id: project?.owner_id || 1,
+                  username: project?.owner_username || 'edwin-esquivel',
+                  name: 'Edwin Esquivel',
+                  role: 'OWNER',
+                  avatar: project?.owner_avatar || 'https://avatars.githubusercontent.com/u/10101?v=4',
+                  joined_at: project?.created_at || new Date().toISOString()
+                }
+              ]).map((member, idx) => {
+                const isLeader = member.user_id === project?.owner_id || member.role === 'OWNER' || (project?.owner_username && member.username?.toLowerCase() === project.owner_username.toLowerCase());
+                const isOnline = onlineUsers.some(u => 
+                  (u.id && member.user_id && Number(u.id) === Number(member.user_id)) ||
+                  (u.username && member.username && u.username.toLowerCase() === member.username.toLowerCase())
+                );
+
+                return (
+                  <div
+                    key={member.id || idx}
+                    className="p-3 rounded-2xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative shrink-0">
+                        <img
+                          src={member.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${member.username}`}
+                          alt={member.username}
+                          className="w-10 h-10 rounded-full border border-slate-300 dark:border-slate-700 object-cover"
+                        />
+                        <span 
+                          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-dark-950 ${
+                            isOnline ? 'bg-emerald-500' : 'bg-slate-400'
+                          }`}
+                          title={isOnline ? 'En línea en este momento' : 'Desconectado'}
+                        />
+                      </div>
+
+                      <div className="truncate">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                            {member.name || member.username}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-cyan-700 dark:text-brand-cyan font-mono block">
+                          @{member.username}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          Unido: {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : 'Activo'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex flex-col items-end gap-1">
+                      {isLeader ? (
+                        <span className="px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-[11px] font-mono font-bold flex items-center gap-1">
+                          <span>👑</span>
+                          <span>Líder</span>
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-xl bg-cyan-500/10 text-cyan-700 dark:text-brand-cyan border border-cyan-500/25 text-[11px] font-mono font-medium flex items-center gap-1">
+                          <span>💻</span>
+                          <span>Miembro</span>
+                        </span>
+                      )}
+                      
+                      <span className={`text-[10px] font-mono font-semibold ${isOnline ? 'text-emerald-500' : 'text-slate-400'}`}>
+                        {isOnline ? '● En línea' : '○ Desconectado'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Security Notice Footer */}
+            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-mono flex items-start gap-2 mb-4">
+              <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <span>
+                <strong>Seguridad y Privacidad:</strong> La lista de tareas, historial y commits de esta sala están cifrados en tránsito y restringidos estrictamente a los miembros autorizados.
+              </span>
+            </div>
+
+            {/* Close Button */}
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsMembersModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white dark:text-brand-cyan border border-slate-700 transition-colors shadow-xs"
+              >
+                Cerrar
+              </button>
+            </div>
+
           </div>
         </div>
       )}

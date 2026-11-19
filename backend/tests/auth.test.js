@@ -93,3 +93,19 @@ test('Auth Middleware: optionalToken proceeds with or without token', () => {
   assert.strictEqual(nextCalled2, true);
   assert.strictEqual(req2.user.username, 'edwin-esquivel');
 });
+
+test('Auth Mailer: sendSecurityWelcomeEmail validates recipient and queues security notice', async () => {
+  const { sendSecurityWelcomeEmail } = require('../utils/mailer');
+
+  // Test invalid email rejection
+  const invalidResult = await sendSecurityWelcomeEmail({ email: 'not-an-email', username: 'dev' });
+  assert.strictEqual(invalidResult.success, false);
+
+  // Test valid email formatting and queuing
+  const validResult = await sendSecurityWelcomeEmail({
+    email: 'developer@example.com',
+    username: 'octocat',
+    name: 'Octocat The Dev'
+  });
+  assert.strictEqual(validResult.success, true);
+});

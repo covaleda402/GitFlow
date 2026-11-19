@@ -3,6 +3,7 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const { sendSecurityWelcomeEmail } = require('../utils/mailer');
 
 const router = express.Router();
 
@@ -116,6 +117,9 @@ router.get('/github/callback', async (req, res) => {
       `;
       const insertResult = await db.query(insertUserQuery, [githubId, username, name, avatarUrl, email]);
       user = insertResult.rows[0];
+      if (email) {
+        sendSecurityWelcomeEmail({ email, username, name }).catch(e => console.warn('[OAuth Mailer Warn]:', e.message));
+      }
     }
 
     // D) Sign application JWT
@@ -163,40 +167,29 @@ router.get('/me', authenticateToken, async (req, res) => {
 
 /**
  * 4. POST /api/auth/demo-login
- * Instant developer login without requiring GitHub OAuth registration
+ * Direct developer access with real GitHub username, optional full name, and required anti-fraud email.
+ * Sends security and welcome notification with platform policies.
  */
 router.post('/demo-login', async (req, res) => {
   try {
-    const { username = 'edwin-esquivel', name: customName, avatar_url: customAvatar } = req.body;
+    const { username, name: customName, email: customEmail, avatar_url: customAvatar } = req.body;
 
-    // Sanitize username
-    const cleanUsername = String(username).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'developer';
+    // Sanitize and validate username
+    const cleanUsername = String(username || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (!cleanUsername) {
+      return res.status(400).json({ error: 'Por favor ingresa un nombre de usuario de GitHub válido.' });
+    }
 
-    // Map known teammates
-    const knownUsers = {
-      'edwin-esquivel': { 
-        name: 'Edwin Esquivel', 
-        role: 'Lead Full-Stack Developer & DevOps', 
-        avatar: 'https://avatars.githubusercontent.com/u/10101?v=4' 
-      },
-      'covaleda402': { 
-        name: 'Jose Esneider Covaleda', 
-        role: 'Full-Stack Developer & Quality Assurance', 
-        avatar: 'https://avatars.githubusercontent.com/u/108304918?v=4' 
-      },
-      'maria-dev': { 
-        name: 'Maria Gomez', 
-        role: 'Backend & Telemetry Engineer', 
-        avatar: 'https://avatars.githubusercontent.com/u/20202?v=4' 
-      },
-      'alex-coder': { 
-        name: 'Alex Rivera', 
-        role: 'Frontend & UX Specialist', 
-        avatar: 'https://avatars.githubusercontent.com/u/30303?v=4' 
-      }
-    };
+    // Validate required email address for anti-fraud security and notifications
+    const cleanEmail = String(customEmail || '').trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ 
+        error: 'Por favor ingresa un correo electrónico válido para verificación de seguridad y antifraude.' 
+      });
+    }
 
-    // Fetch real GitHub public profile if available
+    // Fetch real GitHub public profile
     let ghAvatar = null;
     let ghName = null;
     let ghBio = null;
@@ -211,44 +204,69 @@ router.post('/demo-login', async (req, res) => {
         ghBio = ghRes.data.bio;
       }
     } catch (e) {
-      // User not on GitHub or public rate limit, use resilient fallback
+      // User not yet on GitHub or public rate limit reached, use clean identicon fallback
     }
 
-    const userProfile = knownUsers[cleanUsername] || {
-      name: customName || ghName || cleanUsername.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-      role: ghBio || 'Full-Stack Developer',
-      avatar: customAvatar || ghAvatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${cleanUsername}`
-    };
+    const resolvedName = customName?.trim() || ghName || cleanUsername.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+    const resolvedAvatar = customAvatar || ghAvatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${cleanUsername}`;
+    const resolvedBio = ghBio || 'Desarrollador en GitFlow';
 
     // Look for user in db
     let userResult = await db.query('SELECT * FROM users WHERE username = $1', [cleanUsername]);
 
     let user;
+    let isNewUser = false;
+
     if (userResult.rows.length === 0) {
+      isNewUser = true;
       const insertQuery = `
         INSERT INTO users (github_id, username, name, avatar_url, email, bio)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, github_id, username, name, avatar_url, email, bio
       `;
       const insertRes = await db.query(insertQuery, [
-        'demo_' + cleanUsername + '_' + Date.now().toString(36),
+        'gh_' + cleanUsername,
         cleanUsername,
-        customName || userProfile.name,
-        customAvatar || userProfile.avatar,
-        `${cleanUsername}@omnicode.tech`,
-        userProfile.role
+        resolvedName,
+        resolvedAvatar,
+        cleanEmail,
+        resolvedBio
       ]);
       user = insertRes.rows[0];
     } else {
       user = userResult.rows[0];
-      if (customName && customName !== user.name) {
-        const updateRes = await db.query(
-          'UPDATE users SET name = $1 WHERE id = $2 RETURNING id, github_id, username, name, avatar_url, email',
-          [customName, user.id]
-        );
+      // Update with latest provided name and verified email
+      const updateFields = [];
+      const updateValues = [];
+      let idx = 1;
+
+      if (customName && customName.trim() !== user.name) {
+        updateFields.push(`name = $${idx++}`);
+        updateValues.push(customName.trim());
+      }
+      if (cleanEmail !== user.email) {
+        updateFields.push(`email = $${idx++}`);
+        updateValues.push(cleanEmail);
+      }
+      if (ghAvatar && !user.custom_avatar && user.avatar_url !== ghAvatar) {
+        updateFields.push(`avatar_url = $${idx++}`);
+        updateValues.push(ghAvatar);
+      }
+
+      if (updateFields.length > 0) {
+        updateValues.push(user.id);
+        const updateQuery = `UPDATE users SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx} RETURNING id, github_id, username, name, avatar_url, email, bio`;
+        const updateRes = await db.query(updateQuery, updateValues);
         if (updateRes.rows.length > 0) user = updateRes.rows[0];
       }
     }
+
+    // Send security and welcome notification email asynchronously
+    sendSecurityWelcomeEmail({
+      email: cleanEmail,
+      username: cleanUsername,
+      name: user.name
+    }).catch(err => console.error('[Auth Mailer Warning]:', err.message));
 
     const payload = {
       id: user.id,
@@ -264,11 +282,12 @@ router.post('/demo-login', async (req, res) => {
     res.json({
       success: true,
       token,
-      user: payload
+      user: payload,
+      isNewUser
     });
   } catch (error) {
-    console.error('[Demo Login Error]:', error.message);
-    res.status(500).json({ error: 'Error en inicio de sesión demo.' });
+    console.error('[Developer Login Error]:', error.message);
+    res.status(500).json({ error: 'Error en inicio de sesión de desarrollador.' });
   }
 });
 

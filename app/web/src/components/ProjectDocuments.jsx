@@ -25,7 +25,7 @@ const INITIAL_DOCS = [
   {
     id: 1,
     folder_name: 'Arquitectura',
-    title: 'Diagrama de Flujo y Microservicios v2.0',
+    title: 'Diagrama de Flujo y Microservicios',
     file_type: 'md',
     file_url: '',
     content_markdown: '# Arquitectura del Ecosistema GitFlow\n\n## Servicios Principales:\n1. Ingestión de Webhooks con Regex Parser.\n2. Conexiones Socket.io con salas por proyecto.\n3. Base de Datos Neon PostgreSQL con Prepared Statements.\n4. Rotación criptográfica de códigos de 5 minutos.',

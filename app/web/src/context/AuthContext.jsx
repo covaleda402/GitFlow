@@ -60,8 +60,8 @@ export function AuthProvider({ children }) {
     window.location.href = '/api/auth/github';
   };
 
-  // Instant Demo Login (without GitHub App keys)
-  const loginDemo = async (username = 'edwin-esquivel', customName = null, customAvatar = null) => {
+  // Direct Developer Login with GitHub username, name and anti-fraud email
+  const loginDemo = async (username, customName = null, customEmail = null, customAvatar = null) => {
     setLoading(true);
     try {
       const response = await fetch('/api/auth/demo-login', {
@@ -70,6 +70,7 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ 
           username, 
           name: customName, 
+          email: customEmail,
           avatar_url: customAvatar 
         })
       });
@@ -84,7 +85,7 @@ export function AuthProvider({ children }) {
         throw new Error(data.error || 'Error al autenticar');
       }
     } catch (err) {
-      console.error('[Demo Login Error]:', err.message);
+      console.error('[Developer Login Error]:', err.message);
       return { success: false, error: err.message };
     } finally {
       setLoading(false);

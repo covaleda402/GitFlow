@@ -397,28 +397,12 @@ router.get('/projects/:id/tasks', optionalToken, async (req, res) => {
     const projRes = await db.query('SELECT owner_id FROM projects WHERE id = $1', [projectId]);
     const isOwner = projRes.rows.length > 0 && userId && projRes.rows[0].owner_id === userId;
 
+    const scope = req.query.scope;
     let tasksQuery;
     let params;
 
-    if (isOwner || !userId) {
-      // Owner or unauthenticated preview sees active tasks
-      tasksQuery = `
-        SELECT t.id, t.project_id, t.title, t.description, t.status, t.priority,
-               t.assigned_to_user_id, t.created_by_user_id, t.is_archived, t.created_at, t.updated_at,
-               u.username AS assigned_username,
-               u.name AS assigned_name,
-               COALESCE(u.custom_avatar, u.avatar_url) AS assigned_avatar_url,
-               COUNT(c.id) AS commits_count
-        FROM tasks t
-        LEFT JOIN users u ON u.id = t.assigned_to_user_id
-        LEFT JOIN commits c ON c.task_id = t.id
-        WHERE t.project_id = $1
-        GROUP BY t.id, u.username, u.name, u.custom_avatar, u.avatar_url
-        ORDER BY t.id ASC
-      `;
-      params = [projectId];
-    } else {
-      // Regular Member sees personal tasks only
+    if (scope === 'personal' && userId && !isOwner) {
+      // Personal scope request: regular member sees personal tasks only
       tasksQuery = `
         SELECT t.id, t.project_id, t.title, t.description, t.status, t.priority,
                t.assigned_to_user_id, t.created_by_user_id, t.is_archived, t.created_at, t.updated_at,
@@ -434,6 +418,23 @@ router.get('/projects/:id/tasks', optionalToken, async (req, res) => {
         ORDER BY t.id ASC
       `;
       params = [projectId, userId];
+    } else {
+      // Team-wide tasks list for collaborative agile board
+      tasksQuery = `
+        SELECT t.id, t.project_id, t.title, t.description, t.status, t.priority,
+               t.assigned_to_user_id, t.created_by_user_id, t.is_archived, t.created_at, t.updated_at,
+               u.username AS assigned_username,
+               u.name AS assigned_name,
+               COALESCE(u.custom_avatar, u.avatar_url) AS assigned_avatar_url,
+               COUNT(c.id) AS commits_count
+        FROM tasks t
+        LEFT JOIN users u ON u.id = t.assigned_to_user_id
+        LEFT JOIN commits c ON c.task_id = t.id
+        WHERE t.project_id = $1
+        GROUP BY t.id, u.username, u.name, u.custom_avatar, u.avatar_url
+        ORDER BY t.id ASC
+      `;
+      params = [projectId];
     }
 
     const result = await db.query(tasksQuery, params);

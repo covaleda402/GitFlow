@@ -68,7 +68,7 @@ export default function Navbar({ onSimulateCommit }) {
               </div>
               <div className="flex flex-col">
                 <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-                  GitFlow <span className="text-xs font-mono font-normal text-cyan-600 dark:text-brand-cyan px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">v2.0</span>
+                  GitFlow
                 </span>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono tracking-wider uppercase">Live Telemetry</span>
               </div>
@@ -142,7 +142,10 @@ export default function Navbar({ onSimulateCommit }) {
                     className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-700 object-cover"
                   />
                   <div className="hidden lg:flex flex-col text-left">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{user.name || user.username}</span>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                      <span>{user.name || user.username}</span>
+                      <span title="Líder Técnico" className="text-amber-500 text-xs">👑</span>
+                    </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">@{user.username}</span>
                   </div>
                 </Link>

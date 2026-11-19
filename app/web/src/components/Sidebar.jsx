@@ -85,7 +85,7 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
           </div>
           <div>
             <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-              GitFlow <span className="text-[10px] font-mono text-cyan-700 dark:text-brand-cyan bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30 font-bold">v2.0</span>
+              GitFlow
             </h1>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Agile & Live Telemetry</p>
           </div>
@@ -271,8 +271,11 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
                 className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-700 object-cover shrink-0"
               />
               <div className="truncate">
-                <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-cyan-600 dark:group-hover:text-brand-cyan">
-                  {user?.name || user?.username}
+                <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-cyan-600 dark:group-hover:text-brand-cyan flex items-center gap-1">
+                  <span>{user?.name || user?.username}</span>
+                  {(currentProject?.owner_id === user?.id || currentProject?.owner_username === user?.username) && (
+                    <span title="Líder de la Sala" className="text-amber-500 text-xs">👑</span>
+                  )}
                 </span>
                 <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
                   @{user?.username}

@@ -334,16 +334,32 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
     }
   };
 
+  // Robust My Task matcher by ID, lowercase username, and user name
+  const isMyTask = (t) => {
+    if (!user) return false;
+    const uid = Number(user.id);
+    const matchId = (t.assigned_to_user_id && Number(t.assigned_to_user_id) === uid) ||
+                    (t.created_by_user_id && Number(t.created_by_user_id) === uid);
+    const matchUsername = (t.assigned_username && user.username && t.assigned_username.toLowerCase() === user.username.toLowerCase()) ||
+                          (t.assigned_user?.username && user.username && t.assigned_user.username.toLowerCase() === user.username.toLowerCase());
+    const matchName = t.assigned_name && user.name && (t.assigned_name.toLowerCase() === user.name.toLowerCase());
+    return Boolean(matchId || matchUsername || matchName);
+  };
+
   // Filter tasks based on viewScope and filterUser
   const filteredTasks = tasks.filter(t => {
-    if (viewScope === 'MY_TASKS' && user) {
-      if (t.assigned_to_user_id !== user.id) return false;
+    if (viewScope === 'MY_TASKS') {
+      if (!isMyTask(t)) return false;
     }
     if (filterUser !== 'ALL') {
-      if (String(t.assigned_to_user_id) !== String(filterUser)) return false;
+      const matchFilterId = String(t.assigned_to_user_id) === String(filterUser);
+      const matchFilterUsername = t.assigned_username && String(t.assigned_username).toLowerCase() === String(filterUser).toLowerCase();
+      if (!matchFilterId && !matchFilterUsername) return false;
     }
     return true;
   });
+
+  const myTasksCount = tasks.filter(isMyTask).length;
 
   return (
     <div className="space-y-6">
@@ -362,7 +378,7 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Todas las Tareas ({tasks.length})
+              Todo el Equipo ({tasks.length})
             </button>
             <button
               onClick={() => setViewScope('MY_TASKS')}
@@ -372,16 +388,9 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Mis Tareas Asignadas
+              Mis Tareas ({myTasksCount})
             </button>
           </div>
-
-          {isOwnerView && (
-            <span className="hidden lg:inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
-              <Eye className="w-3.5 h-3.5" />
-              Vista Líder (Dueño de Sala)
-            </span>
-          )}
         </div>
 
         {/* Right side: Developer filter & New Task button */}
@@ -518,8 +527,11 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
                               <User className="w-3 h-3" />
                             </div>
                           )}
-                          <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono truncate max-w-[85px]">
-                            {task.assigned_username ? `@${task.assigned_username}` : 'Sin asignar'}
+                          <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono truncate max-w-[95px] flex items-center gap-1">
+                            <span>{task.assigned_username ? `@${task.assigned_username}` : 'Sin asignar'}</span>
+                            {((project?.owner_id && Number(task.assigned_to_user_id) === Number(project.owner_id)) || (project?.owner_username && task.assigned_username?.toLowerCase() === project.owner_username.toLowerCase())) && (
+                              <span title="Líder / Dueño de Sala" className="text-amber-500 text-[11px]">👑</span>
+                            )}
                           </span>
                         </div>
 
