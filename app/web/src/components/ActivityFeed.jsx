@@ -10,11 +10,13 @@ import {
   Layers 
 } from 'lucide-react';
 
-export default function ActivityFeed({ projectId = 1 }) {
+export default function ActivityFeed({ projectId = 1, project }) {
   const { socket } = useSocket();
   const [commits, setCommits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [latestIncoming, setLatestIncoming] = useState(null);
+
+  const defaultRepo = project?.github_repos?.[0] || project?.github_repo || 'edwin-esquivel-ADSO/GitFlow';
 
   useEffect(() => {
     async function fetchCommits() {
@@ -157,20 +159,16 @@ export default function ActivityFeed({ projectId = 1 }) {
 
                 {/* Hash pill & External Link */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-dark-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200">
-                    {commit.hash}
-                  </span>
-                  {commit.url && (
-                    <a
-                      href={commit.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1 rounded text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
-                      title="Ver commit en GitHub"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
+                  <a
+                    href={commit.url || `https://github.com/${defaultRepo}/commit/${commit.hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-[11px] font-mono font-semibold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-dark-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:text-brand-cyan hover:border-brand-cyan/40 transition-colors"
+                    title="Ver commit en GitHub"
+                  >
+                    <span>{commit.hash}</span>
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                  </a>
                 </div>
               </div>
             </div>

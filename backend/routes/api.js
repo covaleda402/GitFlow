@@ -56,10 +56,17 @@ router.get('/projects', optionalToken, async (req, res) => {
  */
 router.post('/projects', authenticateToken, async (req, res) => {
   try {
-    const { name, description = '', github_repo = 'edwin-esquivel-ADSO/GitFlow', context_markdown = '' } = req.body;
+    const { name, description = '', github_repo, github_repos, context_markdown = '' } = req.body;
 
     if (!name || name.trim() === '') {
       return res.status(400).json({ error: 'El nombre de la sala es obligatorio.' });
+    }
+
+    let finalRepo = 'edwin-esquivel-ADSO/GitFlow';
+    if (Array.isArray(github_repos) && github_repos.length > 0) {
+      finalRepo = github_repos.filter(Boolean).map(r => r.trim()).join(', ');
+    } else if (github_repo && github_repo.trim()) {
+      finalRepo = github_repo.trim();
     }
 
     const defaultMarkdown = context_markdown || `# ${name}\n\nDocumenta aquí las decisiones técnicas, arquitectura y requerimientos de esta sala.`;
@@ -68,7 +75,7 @@ router.post('/projects', authenticateToken, async (req, res) => {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `;
-    const projRes = await db.query(insertProj, [name.trim(), description.trim(), github_repo.trim(), defaultMarkdown, req.user.id]);
+    const projRes = await db.query(insertProj, [name.trim(), description.trim(), finalRepo, defaultMarkdown, req.user.id]);
     const project = projRes.rows[0];
 
     // Assign owner membership
@@ -128,17 +135,64 @@ router.get('/projects/:id', optionalToken, async (req, res) => {
     const currentUserId = req.user ? req.user.id : null;
     const isOwner = project.owner_id === currentUserId;
 
+    const rawRepo = project.github_repo || 'edwin-esquivel-ADSO/GitFlow';
+    const reposList = rawRepo.split(',').map(r => r.trim()).filter(Boolean);
+    const github_repos = reposList.length > 0 ? reposList : ['edwin-esquivel-ADSO/GitFlow'];
+
     res.json({
       success: true,
       project: {
         ...project,
         isOwner,
+        github_repos,
         members: membersRes.rows
       }
     });
   } catch (error) {
     console.error('[API Project Detail Error]:', error.message);
     res.status(500).json({ error: 'Error al consultar sala.' });
+  }
+});
+
+/**
+ * POST /api/projects/:id/repos
+ * Autonomously adds an additional connected repository to an existing room.
+ */
+router.post('/projects/:id/repos', optionalToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+    const { repo } = req.body;
+    if (!repo || !repo.trim()) {
+      return res.status(400).json({ error: 'El nombre del repositorio es requerido (ej. usuario/repositorio).' });
+    }
+    const cleanRepo = repo.trim().replace(/^https?:\/\/github\.com\//, '');
+    const projRes = await db.query('SELECT github_repo FROM projects WHERE id = $1', [projectId]);
+    if (projRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    const currentRepoStr = projRes.rows[0].github_repo || '';
+    const existingList = currentRepoStr.split(',').map(r => r.trim()).filter(Boolean);
+    if (!existingList.includes(cleanRepo)) {
+      existingList.push(cleanRepo);
+    }
+    const updatedString = existingList.join(', ');
+    await db.query('UPDATE projects SET github_repo = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [updatedString, projectId]);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(`project_${projectId}`).emit('repos_updated', { projectId, github_repos: existingList });
+    }
+
+    res.json({
+      success: true,
+      message: `Repositorio "${cleanRepo}" conectado exitosamente.`,
+      github_repos: existingList,
+      github_repo: updatedString
+    });
+  } catch (error) {
+    console.error('[API Add Repo Error]:', error.message);
+    res.status(500).json({ error: 'Error al conectar repositorio.' });
   }
 });
 
@@ -358,7 +412,7 @@ router.get('/projects/:id/tasks', optionalToken, async (req, res) => {
         FROM tasks t
         LEFT JOIN users u ON u.id = t.assigned_to_user_id
         LEFT JOIN commits c ON c.task_id = t.id
-        WHERE t.project_id = $1 AND t.is_archived = false
+        WHERE t.project_id = $1
         GROUP BY t.id, u.username, u.name, u.custom_avatar, u.avatar_url
         ORDER BY t.id ASC
       `;
@@ -375,7 +429,7 @@ router.get('/projects/:id/tasks', optionalToken, async (req, res) => {
         FROM tasks t
         LEFT JOIN users u ON u.id = t.assigned_to_user_id
         LEFT JOIN commits c ON c.task_id = t.id
-        WHERE t.project_id = $1 AND t.is_archived = false AND (t.assigned_to_user_id = $2 OR t.created_by_user_id = $2)
+        WHERE t.project_id = $1 AND (t.assigned_to_user_id = $2 OR t.created_by_user_id = $2)
         GROUP BY t.id, u.username, u.name, u.custom_avatar, u.avatar_url
         ORDER BY t.id ASC
       `;
@@ -546,6 +600,72 @@ router.patch('/tasks/:id/status', optionalToken, async (req, res) => {
   } catch (error) {
     console.error('[API Update Task Status Error]:', error.message);
     res.status(500).json({ error: 'Error al cambiar estado.' });
+  }
+});
+
+/**
+ * POST /api/tasks/:id/commit
+ * Links a specific GitHub commit (hash, repo, message) to this task.
+ */
+router.post('/tasks/:id/commit', optionalToken, async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const { hash, message, repo } = req.body;
+
+    if (!hash || !hash.trim()) {
+      return res.status(400).json({ error: 'El hash o identificador del commit es requerido.' });
+    }
+
+    const cleanHash = hash.trim().replace(/^#/, '').substring(0, 7);
+    const taskRes = await db.query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+    if (taskRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada.' });
+    }
+    const task = taskRes.rows[0];
+
+    // Determine target repository
+    const projRes = await db.query('SELECT github_repo FROM projects WHERE id = $1', [task.project_id]);
+    let targetRepo = 'edwin-esquivel-ADSO/GitFlow';
+    if (repo && repo.trim()) {
+      targetRepo = repo.trim().replace(/^https?:\/\/github\.com\//, '');
+    } else if (projRes.rows.length > 0 && projRes.rows[0].github_repo) {
+      targetRepo = projRes.rows[0].github_repo.split(',')[0].trim();
+    }
+
+    const commitUrl = `https://github.com/${targetRepo}/commit/${cleanHash}`;
+    const authorUsername = req.user ? req.user.username : 'developer';
+    const commitMsg = message && message.trim() ? message.trim() : `feat: avance en tarea #${taskId} [${targetRepo}]`;
+
+    const insertCommitRes = await db.query(`
+      INSERT INTO commits (project_id, task_id, user_id, hash, message, author_name, url, timestamp)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      RETURNING *
+    `, [task.project_id, taskId, req.user ? req.user.id : 1, cleanHash, commitMsg, authorUsername, commitUrl]);
+
+    const savedCommit = insertCommitRes.rows[0];
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(`project_${task.project_id}`).emit('new_commit', {
+        commit: savedCommit,
+        task_id: taskId,
+        task
+      });
+      io.emit('new_commit', {
+        commit: savedCommit,
+        task_id: taskId,
+        task
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Commit #${cleanHash} vinculado exitosamente a la tarea.`,
+      commit: savedCommit
+    });
+  } catch (error) {
+    console.error('[API Link Task Commit Error]:', error.message);
+    res.status(500).json({ error: 'Error al vincular commit a la tarea.' });
   }
 });
 
@@ -1060,19 +1180,86 @@ router.get('/projects/:id/commit-health', optionalToken, async (req, res) => {
     const commitsRes = await db.query('SELECT * FROM commits WHERE project_id = $1 ORDER BY timestamp DESC', [projectId]);
     const commits = commitsRes.rows;
 
-    const healthyCommits = commits.filter(c => !c.message.toLowerCase().includes('broken') && !c.message.toLowerCase().includes('error'));
+    // Evaluate health of each commit
+    const evaluatedCommits = commits.map(c => {
+      const msg = (c.message || '').toLowerCase();
+      const isFaulty = msg.includes('broken') || 
+                       msg.includes('error') || 
+                       msg.includes('fallo') || 
+                       msg.includes('dañino') || 
+                       msg.includes('fail') || 
+                       c.is_faulty === true;
+      return {
+        ...c,
+        is_faulty: isFaulty,
+        health_status: isFaulty ? 'FAULTY' : 'HEALTHY'
+      };
+    });
+
+    const healthyCommits = evaluatedCommits.filter(c => !c.is_faulty);
     const lastStable = healthyCommits.length > 0 ? healthyCommits[0] : (commits[0] || null);
+    const faultyCommits = evaluatedCommits.filter(c => c.is_faulty);
 
     res.json({
       success: true,
       totalTracked: commits.length,
       lastStableCommit: lastStable,
-      hasErrors: commits.length > healthyCommits.length,
-      status: 'OPTIMAL'
+      faultyCommits,
+      evaluatedCommits: evaluatedCommits.slice(0, 10),
+      hasErrors: faultyCommits.length > 0,
+      status: faultyCommits.length > 0 ? 'WARNING' : 'OPTIMAL'
     });
   } catch (error) {
     console.error('[Commit Health Error]:', error.message);
     res.status(500).json({ error: 'Error al evaluar salud de commits.' });
+  }
+});
+
+/**
+ * POST /api/projects/:id/commits/:hash/toggle-faulty
+ * Flags or unflags a specific commit as faulty/harmful (dañino).
+ */
+router.post('/projects/:id/commits/:hash/toggle-faulty', optionalToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+    const { hash } = req.params;
+    const { is_faulty } = req.body;
+
+    // Check if commit exists
+    const commitRes = await db.query('SELECT * FROM commits WHERE project_id = $1 AND hash = $2', [projectId, hash]);
+    if (commitRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Commit no encontrado en esta sala.' });
+    }
+
+    const currentCommit = commitRes.rows[0];
+    const newFaultyStatus = typeof is_faulty === 'boolean' ? is_faulty : !currentCommit.is_faulty;
+
+    await db.query(`
+      UPDATE commits 
+      SET is_faulty = $1 
+      WHERE project_id = $2 AND hash = $3
+    `, [newFaultyStatus, projectId, hash]);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(`project_${projectId}`).emit('commit_health_changed', {
+        projectId,
+        hash,
+        is_faulty: newFaultyStatus
+      });
+    }
+
+    res.json({
+      success: true,
+      message: newFaultyStatus 
+        ? `Commit #${hash} marcado como dañino / con falla.` 
+        : `Commit #${hash} marcado como saludable / funcional.`,
+      hash,
+      is_faulty: newFaultyStatus
+    });
+  } catch (error) {
+    console.error('[Toggle Faulty Commit Error]:', error.message);
+    res.status(500).json({ error: 'Error al actualizar estado del commit.' });
   }
 });
 

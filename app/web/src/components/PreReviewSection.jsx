@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { useUIFeedback } from '../context/UIFeedbackContext';
 import { 
   ShieldCheck, 
   CheckCircle2, 
@@ -25,6 +26,7 @@ import {
 export default function PreReviewSection({ projectId = 1, onSwitchToKanban, onSwitchToHistory }) {
   const { token, user } = useAuth();
   const { socket } = useSocket();
+  const { showToast, confirm } = useUIFeedback();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
@@ -123,6 +125,7 @@ export default function PreReviewSection({ projectId = 1, onSwitchToKanban, onSw
 
       const data = await res.json();
       if (res.ok && data.success) {
+        showToast(`Tarea #${task.id} "${task.title}" aprobada y movida al Historial Terminado.`, 'success');
         setBannerNotice({
           type: 'success',
           text: `Tarea #${task.id} "${task.title}" aprobada y archivada exitosamente en el Historial.`
@@ -130,11 +133,11 @@ export default function PreReviewSection({ projectId = 1, onSwitchToKanban, onSw
         // Optimistic local update
         setTasks(prev => prev.filter(t => t.id !== task.id));
       } else {
-        alert(data.error || 'Error al aprobar la tarea.');
+        showToast(data.error || 'Error al aprobar la tarea.', 'error');
       }
     } catch (err) {
       console.error('Error approving task:', err);
-      alert('Error de conexión al aprobar la tarea.');
+      showToast('Error de conexión al aprobar la tarea.', 'error');
     } finally {
       setActionLoading(prev => ({ ...prev, [task.id]: null }));
     }
@@ -143,9 +146,13 @@ export default function PreReviewSection({ projectId = 1, onSwitchToKanban, onSw
   const handleReject = async (task) => {
     const feedback = reviewNotes[task.id];
     if (!feedback || !feedback.trim()) {
-      const confirmNoFeedback = window.confirm(
-        '¿Deseas devolver esta tarea a "En Progreso" sin notas de retroalimentación? Se recomienda detallar los ajustes requeridos.'
-      );
+      const confirmNoFeedback = await confirm({
+        title: 'Devolver Tarea a "En Progreso"',
+        message: '¿Deseas devolver esta tarea a "En Progreso" sin notas de retroalimentación? Se recomienda detallar los ajustes requeridos para orientar al equipo.',
+        confirmText: 'Devolver sin Notas',
+        cancelText: 'Cancelar',
+        type: 'warning'
+      });
       if (!confirmNoFeedback) return;
     }
 
@@ -165,17 +172,18 @@ export default function PreReviewSection({ projectId = 1, onSwitchToKanban, onSw
 
       const data = await res.json();
       if (res.ok && data.success) {
+        showToast(`Tarea #${task.id} devuelta a "En Progreso" para correcciones.`, 'warning');
         setBannerNotice({
           type: 'warning',
           text: `Tarea #${task.id} devuelta a "En Progreso" para correcciones.`
         });
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'IN_PROGRESS' } : t));
       } else {
-        alert(data.error || 'Error al solicitar ajustes.');
+        showToast(data.error || 'Error al solicitar ajustes.', 'error');
       }
     } catch (err) {
       console.error('Error rejecting task:', err);
-      alert('Error de conexión al devolver la tarea.');
+      showToast('Error de conexión al devolver la tarea.', 'error');
     } finally {
       setActionLoading(prev => ({ ...prev, [task.id]: null }));
     }

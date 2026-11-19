@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useUIFeedback } from '../context/UIFeedbackContext';
 import { 
   Folder, 
   FileText, 
@@ -95,6 +96,7 @@ const INITIAL_DOCS = [
 
 export default function ProjectDocuments({ projectId = 1 }) {
   const { token } = useAuth();
+  const { showToast } = useUIFeedback();
   const [documents, setDocuments] = useState(INITIAL_DOCS);
   const [selectedFolder, setSelectedFolder] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,7 +121,7 @@ export default function ProjectDocuments({ projectId = 1 }) {
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('El archivo no debe superar los 10MB.');
+      showToast('El archivo no debe superar los 10MB.', 'warning');
       return;
     }
 
@@ -143,12 +145,13 @@ export default function ProjectDocuments({ projectId = 1 }) {
         const data = await res.json();
         if (res.ok && data.url) {
           setNewUrl(data.url);
+          showToast('Archivo subido con éxito a Cloudinary.', 'success');
         } else {
-          alert(data.error || 'Error al subir archivo a Cloudinary.');
+          showToast(data.error || 'Error al subir archivo a Cloudinary.', 'error');
         }
       } catch (err) {
         console.error('Error uploading file to Cloudinary:', err);
-        alert('Error de conexión al subir el archivo.');
+        showToast('Error de conexión al subir el archivo.', 'error');
       } finally {
         setUploadingCloudinary(false);
       }

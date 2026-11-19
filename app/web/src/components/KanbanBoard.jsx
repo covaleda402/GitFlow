@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
+import { useUIFeedback } from '../context/UIFeedbackContext';
 import { 
   Plus, 
   GitCommit, 
@@ -14,7 +15,13 @@ import {
   Eye, 
   Archive,
   ListChecks,
-  ChevronDown
+  ChevronDown,
+  Play,
+  RotateCcw,
+  ExternalLink,
+  Github,
+  Sparkles,
+  Link2
 } from 'lucide-react';
 
 const COLUMNS = [
@@ -24,15 +31,19 @@ const COLUMNS = [
   { id: 'DONE', title: 'Terminada (Historial)', color: 'border-emerald-500/50', badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' }
 ];
 
-export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitchToReview }) {
+export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitchToReview, project }) {
   const { socket } = useSocket();
   const { user, token } = useAuth();
+  const { showToast } = useUIFeedback();
   const [tasks, setTasks] = useState([]);
   const [teamUsers, setTeamUsers] = useState([]);
   const [isOwnerView, setIsOwnerView] = useState(false);
   const [viewScope, setViewScope] = useState('ALL'); // 'ALL' | 'MY_TASKS'
   const [loading, setLoading] = useState(true);
   const [filterUser, setFilterUser] = useState('ALL');
+
+  // Repositories available for this room
+  const availableRepos = project?.github_repos || (project?.github_repo ? project.github_repo.split(',').map(r => r.trim()).filter(Boolean) : ['edwin-esquivel-ADSO/GitFlow']);
 
   // New Task Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,6 +57,17 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
   // Instructions interactive collapsible and editing states
   const [expandedInstructions, setExpandedInstructions] = useState({});
   const [editingInstructionsTask, setEditingInstructionsTask] = useState(null);
+
+  // Commit linking modal state
+  const [commitModal, setCommitModal] = useState({
+    isOpen: false,
+    task: null,
+    targetStatus: null,
+    commitHash: '',
+    commitMsg: '',
+    selectedRepo: availableRepos[0] || 'edwin-esquivel-ADSO/GitFlow',
+    loading: false
+  });
 
   // Load Tasks
   const loadTasks = async () => {
@@ -90,10 +112,6 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
 
     const handleTaskUpdated = (updatedTask) => {
       setTasks(prev => {
-        // If task transitioned to DONE and archived, filter it out or update
-        if (updatedTask.status === 'DONE' && updatedTask.is_archived) {
-          return prev.filter(t => t.id !== updatedTask.id);
-        }
         return prev.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask } : t);
       });
     };
@@ -105,24 +123,37 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
       });
     };
 
+    const handleNewCommit = (payload) => {
+      if (payload.task_id) {
+        setTasks(prev => prev.map(t => {
+          if (t.id === payload.task_id) {
+            return {
+              ...t,
+              commits_count: (t.commits_count || 0) + 1,
+              latest_commit_hash: payload.commit.hash,
+              latest_commit_url: payload.commit.url
+            };
+          }
+          return t;
+        }));
+      }
+    };
+
     socket.on('task_status_changed', handleTaskUpdated);
     socket.on('task_created', handleTaskCreated);
+    socket.on('new_commit', handleNewCommit);
 
     return () => {
       socket.off('task_status_changed', handleTaskUpdated);
       socket.off('task_created', handleTaskCreated);
+      socket.off('new_commit', handleNewCommit);
     };
   }, [socket]);
 
   // Move status handler
   const handleMoveStatus = async (taskId, nextStatus) => {
     try {
-      if (nextStatus === 'DONE') {
-        // Optimistically remove from active board and move to history
-        setTasks(prev => prev.filter(t => t.id !== taskId));
-      } else {
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: nextStatus } : t));
-      }
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: nextStatus } : t));
 
       const res = await fetch(`/api/tasks/${taskId}/status`, {
         method: 'PATCH',
@@ -132,16 +163,83 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
         },
         body: JSON.stringify({ 
           status: nextStatus,
-          completion_notes: nextStatus === 'DONE' ? 'Completada y archivada desde el Tablero Ágil.' : null
+          completion_notes: nextStatus === 'DONE' ? 'Completada desde el Tablero Ágil.' : null
         })
       });
 
-      if (!res.ok) {
+      if (res.ok) {
+        if (nextStatus === 'DONE') {
+          showToast('Tarea marcada como Terminada. Ya aparece en la columna Terminada y en el Historial.', 'success');
+        } else if (nextStatus === 'REVIEW') {
+          showToast('Tarea enviada a Revisión Previa (QA).', 'info');
+        } else {
+          showToast(`Estado de la tarea actualizado a "${nextStatus}".`, 'info');
+        }
+      } else {
         loadTasks();
       }
     } catch (err) {
       console.error('Error updating status:', err);
       loadTasks();
+    }
+  };
+
+  // Open Commit Modal before moving or standalone
+  const openCommitModal = (task, targetStatus = null) => {
+    const repos = availableRepos.length > 0 ? availableRepos : ['edwin-esquivel-ADSO/GitFlow'];
+    setCommitModal({
+      isOpen: true,
+      task,
+      targetStatus,
+      commitHash: '',
+      commitMsg: '',
+      selectedRepo: repos[0],
+      loading: false
+    });
+  };
+
+  // Submit Commit Modal
+  const handleCommitSubmit = async (e) => {
+    e.preventDefault();
+    if (!commitModal.task) return;
+
+    setCommitModal(prev => ({ ...prev, loading: true }));
+    const { task, targetStatus, commitHash, commitMsg, selectedRepo } = commitModal;
+
+    try {
+      if (commitHash && commitHash.trim()) {
+        const res = await fetch(`/api/tasks/${task.id}/commit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            hash: commitHash.trim(),
+            message: commitMsg.trim() || `Commit para tarea #${task.id}`,
+            repo: selectedRepo
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Commit #${commitHash.trim().substring(0, 7)} vinculado con éxito a ${selectedRepo}.`, 'success');
+        } else {
+          showToast(data.error || 'Error al vincular commit', 'error');
+        }
+      }
+
+      // If moving to a target status, execute status update
+      if (targetStatus && targetStatus !== task.status) {
+        await handleMoveStatus(task.id, targetStatus);
+      }
+
+      setCommitModal({ isOpen: false, task: null, targetStatus: null, commitHash: '', commitMsg: '', selectedRepo: '', loading: false });
+      loadTasks();
+    } catch (err) {
+      console.error('Error in commit submit:', err);
+      showToast('Error de conexión al vincular commit.', 'error');
+      setCommitModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -163,39 +261,43 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
           description: newDescription,
           instructions: newInstructions,
           priority: newPriority,
-          assigned_to_user_id: newAssignedUser ? parseInt(newAssignedUser, 10) : user?.id
+          assigned_to_user_id: newAssignedUser || null
         })
       });
 
       const data = await res.json();
       if (res.ok && data.task) {
+        setTasks(prev => [...prev, data.task]);
         setIsModalOpen(false);
         setNewTitle('');
         setNewDescription('');
         setNewInstructions('');
         setNewPriority('MEDIUM');
         setNewAssignedUser('');
-        setTasks(prev => [...prev, data.task]);
+        showToast('Tarea creada exitosamente.', 'success');
+      } else {
+        showToast(data.error || 'Error al crear la tarea.', 'error');
       }
     } catch (err) {
       console.error('Error creating task:', err);
+      showToast('Error de conexión al crear tarea.', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Save/Update Instructions handler
+  // Save edited instructions
   const handleSaveInstructions = async (e) => {
     e.preventDefault();
     if (!editingInstructionsTask) return;
 
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       const res = await fetch(`/api/tasks/${editingInstructionsTask.id}/instructions`, {
         method: 'PATCH',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           instructions: editingInstructionsTask.instructions
         })
@@ -209,12 +311,13 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
             : t
         ));
         setEditingInstructionsTask(null);
+        showToast('Instrucciones actualizadas correctamente.', 'success');
       } else {
-        alert(data.error || 'Error al guardar las instrucciones.');
+        showToast(data.error || 'Error al guardar las instrucciones.', 'error');
       }
     } catch (err) {
       console.error('Error saving instructions:', err);
-      alert('Error de conexión al guardar las instrucciones.');
+      showToast('Error de conexión al guardar las instrucciones.', 'error');
     }
   };
 
@@ -225,87 +328,71 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
       case 'HIGH':
         return <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 font-semibold"><AlertCircle className="w-3 h-3" /> Alta</span>;
       case 'LOW':
-        return <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold">Baja</span>;
+        return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-500 font-semibold">Baja</span>;
       default:
-        return <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/30 font-semibold">Media</span>;
+        return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/30 font-semibold">Media</span>;
     }
   };
 
-  const filteredTasks = tasks.filter(task => {
-    if (viewScope === 'MY_TASKS') {
-      return task.assigned_to_user_id === user?.id || task.created_by_user_id === user?.id;
+  // Filter tasks based on viewScope and filterUser
+  const filteredTasks = tasks.filter(t => {
+    if (viewScope === 'MY_TASKS' && user) {
+      if (t.assigned_to_user_id !== user.id) return false;
     }
     if (filterUser !== 'ALL') {
-      return String(task.assigned_to_user_id) === String(filterUser);
+      if (String(t.assigned_to_user_id) !== String(filterUser)) return false;
     }
     return true;
   });
 
   return (
-    <div className="w-full space-y-4">
+    <div className="space-y-6">
       
-      {/* Privacy Notice Banner & Scope Switcher */}
-      <div className={`p-3.5 rounded-2xl border text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-        isOwnerView 
-          ? 'bg-cyan-500/10 border-cyan-500/30 text-slate-800 dark:text-brand-cyan' 
-          : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-700 dark:text-indigo-300'
-      }`}>
+      {/* Top Filter and Controls Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800">
+        
+        {/* View Scope Toggle */}
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 shrink-0 text-cyan-600 dark:text-brand-cyan" />
-          <span>
-            {isOwnerView 
-              ? '👑 Vista de Administrador/Creador: Supervisión completa de todo el equipo.'
-              : '🔒 Vista Personal: Solo ves tus tareas asignadas. El creador de la sala supervisa el equipo completo.'}
-          </span>
-        </div>
-
-        {/* Scope Toggle for Owner */}
-        {isOwnerView && (
-          <div className="flex items-center bg-white dark:bg-dark-900 border border-slate-300 dark:border-slate-700 rounded-xl p-0.5 self-start sm:self-auto shrink-0 shadow-xs">
+          <div className="flex p-1 rounded-xl bg-slate-100 dark:bg-dark-900 border border-slate-200 dark:border-slate-800 text-xs">
             <button
               onClick={() => setViewScope('ALL')}
-              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-mono font-medium transition-colors ${
                 viewScope === 'ALL'
-                  ? 'bg-cyan-500/20 text-cyan-700 dark:text-brand-cyan shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Todo el Equipo
+              Todas las Tareas ({tasks.length})
             </button>
             <button
               onClick={() => setViewScope('MY_TASKS')}
-              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-mono font-medium transition-colors ${
                 viewScope === 'MY_TASKS'
-                  ? 'bg-cyan-500/20 text-cyan-700 dark:text-brand-cyan shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Mis Tareas
+              Mis Tareas Asignadas
             </button>
           </div>
-        )}
-      </div>
 
-      {/* Kanban Top Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-slate-800">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            Tablero Ágil & Telemetría
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Vinculación automática mediante commits <code className="text-brand-cyan font-mono">#ID</code> y cierre con <code className="text-emerald-500 font-mono">fixes #ID</code>.
-          </p>
+          {isOwnerView && (
+            <span className="hidden lg:inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+              <Eye className="w-3.5 h-3.5" />
+              Vista Líder (Dueño de Sala)
+            </span>
+          )}
         </div>
 
+        {/* Right side: Developer filter & New Task button */}
         <div className="flex items-center gap-3">
-          {/* Filter by Member (if Owner) */}
-          {isOwnerView && (
-            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-dark-900 border border-slate-200 dark:border-slate-700/80 rounded-xl px-2.5 py-1 text-xs">
+          {teamUsers.length > 0 && (
+            <div className="flex items-center gap-2">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
               <select
                 value={filterUser}
                 onChange={(e) => setFilterUser(e.target.value)}
-                className="bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none text-xs"
+                className="text-xs px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-dark-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-brand-cyan font-mono"
               >
                 <option value="ALL">Todos los asignados</option>
                 {teamUsers.map(u => (
@@ -318,10 +405,10 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
           {/* New Task Button */}
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 transition-all shadow-md shadow-brand-cyan/20"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 transition-all shadow-md shadow-brand-cyan/20 font-bold"
           >
             <Plus className="w-4 h-4" />
-            Nueva Tarea
+            <span>Nueva Tarea</span>
           </button>
         </div>
       </div>
@@ -340,7 +427,7 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
               <div className="flex items-center justify-between mb-3 px-1">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-wide flex items-center gap-2">
                   {col.title}
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${col.badge}`}>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${col.badge} font-bold`}>
                     {columnTasks.length}
                   </span>
                 </span>
@@ -348,129 +435,243 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
 
               {/* Task Cards Container */}
               <div className="space-y-3 flex-1">
-                {columnTasks.map(task => (
-                  <div
-                    key={task.id}
-                    className="p-3.5 rounded-2xl glass-card transition-all hover:shadow-lg group relative border border-slate-200 dark:border-slate-800"
-                  >
-                    {/* Top: ID & Priority */}
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-[11px] font-mono font-bold text-brand-cyan px-2 py-0.5 rounded bg-brand-cyan/10 border border-brand-cyan/25">
-                        #{task.id}
-                      </span>
-                      {getPriorityBadge(task.priority)}
-                    </div>
+                {columnTasks.map(task => {
+                  const defaultRepoForTask = availableRepos[0] || 'edwin-esquivel-ADSO/GitFlow';
 
-                    {/* Title */}
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-cyan transition-colors line-clamp-2">
-                      {task.title}
-                    </h4>
-
-                    {/* Description */}
-                    {task.description && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-                        {task.description}
-                      </p>
-                    )}
-
-                    {/* Step-by-step Instructions Accordion Button */}
-                    <div className="mt-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedInstructions(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
-                        className="flex items-center gap-1 text-[11px] font-mono text-cyan-600 dark:text-brand-cyan hover:underline w-full justify-between py-1 px-2 rounded-lg bg-cyan-500/10 dark:bg-cyan-500/5 border border-cyan-500/20"
-                        title="Ver o editar instrucciones paso a paso"
-                      >
-                        <span className="flex items-center gap-1 font-semibold truncate">
-                          <ListChecks className="w-3.5 h-3.5 shrink-0" />
-                          <span>{task.instructions ? 'Pasos e Instrucciones' : '+ Añadir instrucciones'}</span>
+                  return (
+                    <div
+                      key={task.id}
+                      className="p-3.5 rounded-2xl glass-card transition-all hover:shadow-lg group relative border border-slate-200 dark:border-slate-800"
+                    >
+                      {/* Top: ID & Priority */}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-[11px] font-mono font-bold text-brand-cyan px-2 py-0.5 rounded bg-brand-cyan/10 border border-brand-cyan/25">
+                          #{task.id}
                         </span>
-                        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${expandedInstructions[task.id] ? 'rotate-180' : ''}`} />
-                      </button>
+                        {getPriorityBadge(task.priority)}
+                      </div>
 
-                      {expandedInstructions[task.id] && (
-                        <div className="mt-1.5 p-2.5 rounded-xl bg-slate-50 dark:bg-dark-950/80 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300 space-y-1.5 animate-fade-in">
-                          {task.instructions ? (
-                            <div className="whitespace-pre-line leading-relaxed font-sans text-slate-800 dark:text-slate-200">
-                              {task.instructions}
-                            </div>
-                          ) : (
-                            <p className="text-[10px] text-slate-400 italic font-mono">Sin pasos documentados aún.</p>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setEditingInstructionsTask({ id: task.id, title: task.title, instructions: task.instructions || '' })}
-                            className="text-[10px] text-cyan-600 dark:text-brand-cyan hover:underline font-mono block text-right w-full pt-1"
-                          >
-                            ✏️ Editar pasos
-                          </button>
-                        </div>
+                      {/* Title */}
+                      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-cyan transition-colors line-clamp-2">
+                        {task.title}
+                      </h4>
+
+                      {/* Description */}
+                      {task.description && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                          {task.description}
+                        </p>
                       )}
-                    </div>
 
-                    {/* Bottom: Assignee & Commits count */}
-                    <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800/70 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        {task.assigned_avatar_url ? (
-                          <img
-                            src={task.assigned_avatar_url}
-                            alt={task.assigned_username || 'dev'}
-                            className="w-5 h-5 rounded-full border border-slate-300 dark:border-slate-700 object-cover"
-                            title={`Asignado a: @${task.assigned_username}`}
-                          />
-                        ) : (
-                          <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px] text-slate-500">
-                            <User className="w-3 h-3" />
+                      {/* Step-by-step Instructions Accordion Button */}
+                      <div className="mt-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedInstructions(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
+                          className="w-full flex items-center justify-between p-1.5 px-2.5 rounded-xl bg-slate-100 dark:bg-dark-900/80 hover:bg-slate-200 dark:hover:bg-dark-800 text-[11px] font-mono text-slate-700 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-800"
+                        >
+                          <span className="flex items-center gap-1.5 truncate font-semibold">
+                            <ListChecks className="w-3.5 h-3.5 text-cyan-600 dark:text-brand-cyan" />
+                            {task.instructions ? 'Ver instrucciones' : '+ Añadir instrucciones'}
+                          </span>
+                          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${expandedInstructions[task.id] ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {/* Collapsible content */}
+                        {expandedInstructions[task.id] && (
+                          <div className="mt-2 p-2.5 rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-200 dark:border-slate-800 space-y-2 animate-fade-in text-xs font-sans">
+                            {task.instructions ? (
+                              <div className="text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed text-[11px] font-mono">
+                                {task.instructions}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-slate-400 italic font-mono">
+                                No se han registrado pasos para esta tarea.
+                              </p>
+                            )}
+
+                            <div className="pt-1 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setEditingInstructionsTask({ id: task.id, title: task.title, instructions: task.instructions || '' })}
+                                className="text-[10px] font-mono text-cyan-600 dark:text-brand-cyan hover:underline font-bold"
+                              >
+                                {task.instructions ? 'Editar pasos' : 'Redactar pasos'}
+                              </button>
+                            </div>
                           </div>
                         )}
-                        <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono truncate max-w-[85px]">
-                          {task.assigned_username ? `@${task.assigned_username}` : 'Sin asignar'}
-                        </span>
                       </div>
 
-                      <div 
-                        className={`flex items-center gap-1 text-[11px] font-mono ${
-                          task.commits_count > 0 ? 'text-brand-cyan' : 'text-slate-400'
-                        }`}
-                        title={`${task.commits_count} commits vinculados`}
-                      >
-                        <GitCommit className="w-3.5 h-3.5" />
-                        <span>{task.commits_count}</span>
-                      </div>
-                    </div>
+                      {/* Bottom: Assignee & Commits count with Direct Link */}
+                      <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800/70 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          {task.assigned_avatar_url ? (
+                            <img
+                              src={task.assigned_avatar_url}
+                              alt={task.assigned_username || 'dev'}
+                              className="w-5 h-5 rounded-full border border-slate-300 dark:border-slate-700 object-cover"
+                              title={`Asignado a: @${task.assigned_username}`}
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px] text-slate-500">
+                              <User className="w-3 h-3" />
+                            </div>
+                          )}
+                          <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono truncate max-w-[85px]">
+                            {task.assigned_username ? `@${task.assigned_username}` : 'Sin asignar'}
+                          </span>
+                        </div>
 
-                    {/* Status Action Buttons */}
-                    <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-800/50 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400">Mover:</span>
-                      <div className="flex items-center gap-1">
-                        {COLUMNS.filter(c => c.id !== task.status).map(targetCol => (
+                        {/* Commits Pill with link */}
+                        <div className="flex items-center gap-1.5">
                           <button
-                            key={targetCol.id}
-                            onClick={() => handleMoveStatus(task.id, targetCol.id)}
-                            className="text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-brand-cyan/20 text-slate-700 dark:text-slate-300 transition-colors font-mono"
-                            title={`Mover a ${targetCol.title}`}
+                            type="button"
+                            onClick={() => openCommitModal(task, null)}
+                            className={`flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-lg border transition-colors ${
+                              task.commits_count > 0 
+                                ? 'bg-cyan-500/10 text-cyan-700 dark:text-brand-cyan border-cyan-500/30 hover:bg-cyan-500/20' 
+                                : 'text-slate-400 border-transparent hover:border-slate-300'
+                            }`}
+                            title="Ver o vincular commit de GitHub"
                           >
-                            {targetCol.id === 'DONE' ? 'Terminar' : targetCol.title.substring(0, 3)}
+                            <GitCommit className="w-3.5 h-3.5" />
+                            <span className="font-bold">{task.commits_count || 0}</span>
                           </button>
-                        ))}
+                        </div>
                       </div>
+
+                      {/* Status Action Buttons with Full Text & Clear Roles */}
+                      <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800/60 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
+                          <span className="font-semibold">Mover a:</span>
+                          <button
+                            type="button"
+                            onClick={() => openCommitModal(task, null)}
+                            className="text-[10px] text-cyan-600 dark:text-brand-cyan hover:underline flex items-center gap-1 font-bold"
+                            title="Vincular un commit de GitHub a esta tarea"
+                          >
+                            <Link2 className="w-3 h-3" />
+                            <span>+ Commit</span>
+                          </button>
+                        </div>
+
+                        {/* Dynamic Action Buttons for TODO */}
+                        {task.status === 'TODO' && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => handleMoveStatus(task.id, 'IN_PROGRESS')}
+                              className="flex-1 py-1.5 px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30 text-[11px] font-mono font-semibold flex items-center justify-center gap-1 transition-all"
+                              title="Iniciar trabajo en esta tarea"
+                            >
+                              <Play className="w-3 h-3" />
+                              <span>En Progreso</span>
+                            </button>
+                            <button
+                              onClick={() => openCommitModal(task, 'REVIEW')}
+                              className="py-1.5 px-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-mono font-semibold flex items-center gap-1 transition-all"
+                              title="Pedir revisión técnica en QA"
+                            >
+                              <ShieldCheck className="w-3 h-3" />
+                              <span>Pedir QA</span>
+                            </button>
+                            <button
+                              onClick={() => openCommitModal(task, 'DONE')}
+                              className="py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-mono font-semibold flex items-center gap-1 transition-all"
+                              title="Marcar como terminada y pasar al Historial"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Terminar</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Dynamic Action Buttons for IN_PROGRESS */}
+                        {task.status === 'IN_PROGRESS' && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => handleMoveStatus(task.id, 'TODO')}
+                              className="py-1.5 px-2 rounded-xl bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300/60 text-[11px] font-mono font-semibold flex items-center gap-1 transition-all"
+                              title="Regresar a Por Hacer"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Por Hacer</span>
+                            </button>
+                            <button
+                              onClick={() => openCommitModal(task, 'REVIEW')}
+                              className="flex-1 py-1.5 px-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[11px] font-mono font-semibold flex items-center justify-center gap-1 transition-all shadow-xs"
+                              title="Enviar a Revisión Previa (QA) opcional"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Pedir Revisión QA</span>
+                            </button>
+                            <button
+                              onClick={() => openCommitModal(task, 'DONE')}
+                              className="py-1.5 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-mono font-bold flex items-center gap-1 transition-all shadow-xs"
+                              title="Marcar directamente como terminada"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Terminar</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Dynamic Action Buttons for REVIEW */}
+                        {task.status === 'REVIEW' && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleMoveStatus(task.id, 'IN_PROGRESS')}
+                                className="flex-1 py-1.5 px-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30 text-[11px] font-mono font-semibold flex items-center justify-center gap-1 transition-all"
+                                title="Volver a En Progreso"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Volver a Progreso</span>
+                              </button>
+                              <button
+                                onClick={() => handleMoveStatus(task.id, 'DONE')}
+                                className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-mono font-bold flex items-center justify-center gap-1 transition-all"
+                                title="Aprobar y pasar a Historial Terminado"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Aprobar y Terminar</span>
+                              </button>
+                            </div>
+
+                            {onSwitchToReview && (
+                              <button
+                                type="button"
+                                onClick={onSwitchToReview}
+                                className="w-full py-1.5 px-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-700 dark:text-purple-300 text-[11px] font-mono flex items-center justify-center gap-1.5 font-semibold transition-all shadow-xs"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                <span>Ir a Revisión Previa (QA) ➔</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Dynamic Action Buttons for DONE */}
+                        {task.status === 'DONE' && (
+                          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                            <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Terminada (Historial)</span>
+                            </span>
+                            <button
+                              onClick={() => handleMoveStatus(task.id, 'IN_PROGRESS')}
+                              className="text-[10px] font-mono text-slate-500 hover:text-cyan-600 dark:hover:text-brand-cyan underline font-semibold"
+                              title="Reabrir tarea en progreso"
+                            >
+                              Reabrir
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                     </div>
-
-                    {/* Jump to Pre-Review button if in REVIEW */}
-                    {task.status === 'REVIEW' && onSwitchToReview && (
-                      <button
-                        type="button"
-                        onClick={onSwitchToReview}
-                        className="mt-2 w-full py-1.5 px-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-700 dark:text-purple-300 text-[11px] font-mono flex items-center justify-center gap-1.5 font-semibold transition-all shadow-xs"
-                        title="Ir al apartado de revisión previa para validar y aprobar formalmente"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Revisión Previa QA ➔</span>
-                      </button>
-                    )}
-
-                  </div>
-                ))}
+                  );
+                })}
 
                 {columnTasks.length === 0 && (
                   <div className="h-32 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl flex items-center justify-center text-xs text-slate-400 font-mono">
@@ -483,9 +684,123 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
         })}
       </div>
 
+      {/* Commit Linking Modal with Multi-Repo Autonomous Support */}
+      {commitModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-dark-950/80 backdrop-blur-md animate-fade-in font-sans">
+          <div className="glass-panel w-full max-w-md p-5 sm:p-6 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900 animate-scale-up space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <GitCommit className="w-4 h-4 text-brand-cyan" />
+                <span>Vincular Commit de GitHub</span>
+              </h3>
+              <button
+                onClick={() => setCommitModal({ isOpen: false, task: null, targetStatus: null, commitHash: '', commitMsg: '', selectedRepo: '', loading: false })}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Registra el hash o identificador del commit para asociarlo a la tarea <strong>#{commitModal.task?.id}</strong>. Podrás abrir el commit directamente en GitHub.
+            </p>
+
+            <form onSubmit={handleCommitSubmit} className="space-y-3.5">
+              
+              {/* Repository Selector (Auto if 1 repo, dropdown if multiple repos) */}
+              <div>
+                <label className="block text-xs font-mono text-slate-600 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Github className="w-3.5 h-3.5 text-cyan-600 dark:text-brand-cyan" />
+                    Repositorio de GitHub:
+                  </span>
+                  {availableRepos.length === 1 && (
+                    <span className="text-[10px] text-cyan-600 dark:text-brand-cyan font-bold">
+                      (Seleccionado automático)
+                    </span>
+                  )}
+                </label>
+
+                {availableRepos.length > 1 ? (
+                  <select
+                    value={commitModal.selectedRepo}
+                    onChange={(e) => setCommitModal(prev => ({ ...prev, selectedRepo: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-mono"
+                  >
+                    {availableRepos.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="px-3 py-2 text-xs rounded-xl bg-slate-100 dark:bg-dark-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-mono font-semibold flex items-center justify-between">
+                    <span>{availableRepos[0] || 'edwin-esquivel-ADSO/GitFlow'}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold">Único</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Commit Hash input */}
+              <div>
+                <label className="block text-xs font-mono text-slate-600 dark:text-slate-300 mb-1">
+                  Hash / SHA del Commit de GitHub (ej. 3d4e5f6 o f608773):
+                </label>
+                <input
+                  type="text"
+                  value={commitModal.commitHash}
+                  onChange={(e) => setCommitModal(prev => ({ ...prev, commitHash: e.target.value }))}
+                  placeholder="ej. 3d4e5f6"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-mono"
+                />
+              </div>
+
+              {/* Commit Message input */}
+              <div>
+                <label className="block text-xs font-mono text-slate-600 dark:text-slate-300 mb-1">
+                  Mensaje del Commit (Opcional):
+                </label>
+                <input
+                  type="text"
+                  value={commitModal.commitMsg}
+                  onChange={(e) => setCommitModal(prev => ({ ...prev, commitMsg: e.target.value }))}
+                  placeholder="ej. feat: implementación de endpoint completada"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-sans"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const { task, targetStatus } = commitModal;
+                    if (targetStatus && targetStatus !== task.status) {
+                      handleMoveStatus(task.id, targetStatus);
+                    }
+                    setCommitModal({ isOpen: false, task: null, targetStatus: null, commitHash: '', commitMsg: '', selectedRepo: '', loading: false });
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                >
+                  {commitModal.targetStatus ? 'Continuar sin Commit' : 'Cancelar'}
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={commitModal.loading}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-cyan hover:bg-cyan-300 text-dark-950 transition-all shadow-md shadow-brand-cyan/20 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <GitCommit className="w-3.5 h-3.5" />
+                  <span>{commitModal.loading ? 'Guardando...' : (commitModal.targetStatus ? 'Guardar Commit y Mover' : 'Vincular Commit')}</span>
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* New Task Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in font-sans">
           <div className="glass-panel w-full max-w-lg p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -579,7 +894,7 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 shadow-md shadow-brand-cyan/20 disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 shadow-md shadow-brand-cyan/20 disabled:opacity-50 font-bold"
                 >
                   {submitting ? 'Guardando...' : 'Crear Tarea'}
                 </button>
@@ -630,7 +945,7 @@ export default function KanbanBoard({ projectId = 1, onSwitchToHistory, onSwitch
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 shadow-sm"
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 shadow-sm font-bold"
                 >
                   Guardar Pasos
                 </button>

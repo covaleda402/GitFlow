@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -23,20 +23,23 @@ import {
 } from 'lucide-react';
 
 export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoom, onSimulatePush, onOpenChatbot }) {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const { theme, toggleTheme, isDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
 
   const [projects, setProjects] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     async function loadProjects() {
       try {
-        const res = await fetch('/api/projects');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch('/api/projects', { headers });
         const data = await res.json();
-        if (data.success) {
+        if (data.success && Array.isArray(data.projects)) {
           setProjects(data.projects);
         }
       } catch (err) {
@@ -44,7 +47,18 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
       }
     }
     loadProjects();
-  }, [projectId]);
+  }, [projectId, token]);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const currentProject = projects.find(p => p.id === Number(projectId)) || { name: 'GitFlow Ecosystem' };
   const currentTab = new URLSearchParams(location.search).get('tab') || 'kanban';
@@ -88,9 +102,16 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
       </div>
 
       {/* Room Selector with Prominent "+ Nueva Sala" and "Unirse" buttons */}
-      <div className="my-4 relative space-y-2">
+      <div ref={dropdownRef} className="my-4 relative space-y-2">
         <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-slate-400 px-1">
-          <span className="font-bold">SALA ACTIVA</span>
+          <span className="font-bold flex items-center gap-1.5">
+            <span>SALA ACTIVA</span>
+            {projects.length > 1 && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-500/15 text-cyan-700 dark:text-brand-cyan font-bold">
+                {projects.length}
+              </span>
+            )}
+          </span>
           <div className="flex items-center gap-2">
             <button 
               onClick={onOpenJoinRoom}
@@ -115,31 +136,80 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
         {/* Selector Dropdown trigger */}
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-dark-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white text-xs font-semibold text-left hover:border-brand-cyan/40 transition-all shadow-xs"
+          className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold text-left transition-all shadow-xs ${
+            dropdownOpen
+              ? 'bg-cyan-500/10 border-brand-cyan/60 text-cyan-700 dark:text-brand-cyan'
+              : 'bg-slate-50 dark:bg-dark-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white hover:border-brand-cyan/40'
+          }`}
+          title="Haz clic para desplegar y cambiar a otra sala"
         >
-          <span className="truncate pr-2 font-bold">{currentProject.name}</span>
-          <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+          <div className="truncate pr-2">
+            <span className="font-bold block truncate">{currentProject.name}</span>
+            <span className="text-[10px] text-slate-400 font-mono block truncate">
+              {currentProject.github_repo ? currentProject.github_repo.split(',')[0] : 'edwin-esquivel-ADSO/GitFlow'}
+            </span>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${dropdownOpen ? 'rotate-180 text-brand-cyan' : ''}`} />
         </button>
 
         {dropdownOpen && (
-          <div className="absolute top-full left-0 right-0 mt-1 z-30 p-1.5 rounded-2xl glass-panel border border-slate-300 dark:border-slate-700 shadow-xl space-y-1 bg-white dark:bg-dark-900">
-            {projects.map(p => (
+          <div className="absolute top-full left-0 right-0 mt-1 z-30 p-2 rounded-2xl glass-panel border border-slate-300 dark:border-slate-700 shadow-2xl space-y-1 bg-white dark:bg-dark-900 max-h-72 overflow-y-auto animate-scale-up">
+            <div className="px-2 py-1 text-[10px] font-mono text-slate-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1 mb-1">
+              <span>Tus Salas Disponibles ({projects.length})</span>
+            </div>
+
+            {projects.map(p => {
+              const isSelected = p.id === Number(projectId);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    navigate(`/projects/${p.id}`);
+                  }}
+                  className={`w-full flex items-center justify-between p-2 rounded-xl text-xs text-left transition-all ${
+                    isSelected
+                      ? 'bg-cyan-500/15 text-cyan-800 dark:text-brand-cyan font-bold border border-cyan-500/30 shadow-xs'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="truncate pr-2">
+                    <div className="flex items-center gap-1.5">
+                      {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan shrink-0" />}
+                      <span className="truncate">{p.name}</span>
+                    </div>
+                    {p.github_repo && (
+                      <span className="text-[10px] text-slate-400 font-mono block truncate">
+                        {p.github_repo.split(',')[0]}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200/50 dark:bg-slate-800 text-slate-500 shrink-0">
+                    #{p.id}
+                  </span>
+                </button>
+              );
+            })}
+
+            {projects.length === 0 && (
+              <div className="p-3 text-center text-xs text-slate-400 font-mono">
+                No hay más salas disponibles.
+              </div>
+            )}
+
+            <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1 text-[11px]">
               <button
-                key={p.id}
+                type="button"
                 onClick={() => {
                   setDropdownOpen(false);
-                  navigate(`/projects/${p.id}`);
+                  onOpenCreateRoom?.();
                 }}
-                className={`w-full flex items-center justify-between p-2 rounded-xl text-xs text-left transition-colors ${
-                  p.id === Number(projectId)
-                    ? 'bg-cyan-500/15 text-cyan-700 dark:text-brand-cyan font-bold'
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
+                className="w-full py-1.5 px-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold font-mono text-center flex items-center justify-center gap-1 transition-colors"
               >
-                <span className="truncate">{p.name}</span>
-                <span className="text-[10px] font-mono text-slate-400">#{p.id}</span>
+                <Plus className="w-3.5 h-3.5" />
+                <span>Crear Otra Sala</span>
               </button>
-            ))}
+            </div>
           </div>
         )}
       </div>

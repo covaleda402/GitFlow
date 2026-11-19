@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useUIFeedback } from '../context/UIFeedbackContext';
 import Sidebar from '../components/Sidebar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import MobileTopBar from '../components/MobileTopBar';
@@ -93,6 +94,7 @@ export default function ProfileView() {
   }, [user]);
 
   // Edit states
+  const { showToast } = useUIFeedback();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.name || user?.username || INITIAL_PROFILE.name);
   const [bio, setBio] = useState(user?.bio || INITIAL_PROFILE.bio);
@@ -144,13 +146,13 @@ export default function ProfileView() {
     // Formatos permitidos: estrictamente PNG y JPG
     const validMimes = ['image/png', 'image/jpeg', 'image/jpg'];
     if (!validMimes.includes(file.type)) {
-      alert('Formato no permitido. Solo se aceptan archivos de imagen PNG y JPG.');
+      showToast('Formato no permitido. Solo se aceptan archivos de imagen PNG y JPG.', 'warning');
       return;
     }
 
     // Tamaño máximo permitido: 2MB
     if (file.size > 2 * 1024 * 1024) {
-      alert('El archivo excede el tamaño máximo permitido de 2 MB.');
+      showToast('El archivo excede el tamaño máximo permitido de 2 MB.', 'warning');
       return;
     }
 
@@ -183,12 +185,13 @@ export default function ProfileView() {
       if (res.ok && data.url) {
         setSelectedAvatar(data.url);
         setCustomAvatarInput(data.url);
+        showToast('Ícono subido y optimizado con éxito en Cloudinary.', 'success');
       } else {
-        alert(data.error || 'Error al procesar la subida del ícono a Cloudinary.');
+        showToast(data.error || 'Error al procesar la subida del ícono a Cloudinary.', 'error');
       }
     } catch (err) {
       console.error('Error uploading to Cloudinary:', err);
-      alert('Error de conexión al subir el ícono: ' + err.message);
+      showToast('Error de conexión al subir el ícono: ' + err.message, 'error');
     } finally {
       setUploadingCloudinary(false);
     }

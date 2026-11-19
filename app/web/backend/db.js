@@ -625,7 +625,7 @@ function executeMockFallback(text, params) {
     const project = mockStore.projects.find(p => p.id === projectId);
     const isOwner = project && userId && project.owner_id === userId;
 
-    let filtered = mockStore.tasks.filter(t => t.project_id === projectId && !t.is_archived);
+    let filtered = mockStore.tasks.filter(t => t.project_id === projectId);
 
     // If regular member, filter to only their tasks!
     if (!isOwner && userId) {
@@ -752,6 +752,35 @@ function executeMockFallback(text, params) {
   }
 
   // 14. COMMITS
+  if (normalized.startsWith('insert into commits')) {
+    const newCommit = {
+      id: mockStore.commits.length + 1,
+      project_id: Number(params[0]),
+      task_id: params[1] ? Number(params[1]) : null,
+      user_id: params[2] ? Number(params[2]) : 1,
+      hash: params[3],
+      message: params[4],
+      author_name: params[5] || 'developer',
+      url: params[6] || '',
+      timestamp: params[7] ? new Date(params[7]) : new Date()
+    };
+    mockStore.commits.unshift(newCommit);
+    return { rows: [newCommit], rowCount: 1 };
+  }
+
+  // 14b. UPDATE projects set github_repo
+  if (normalized.startsWith('update projects set github_repo')) {
+    const newRepo = params[0];
+    const projectId = Number(params[1]);
+    const project = mockStore.projects.find(p => p.id === projectId);
+    if (project) {
+      project.github_repo = newRepo;
+      project.updated_at = new Date();
+      return { rows: [project], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
   if (normalized.includes('from commits')) {
     let list = [...mockStore.commits];
     if (normalized.includes('project_id = $1') && params[0]) {
