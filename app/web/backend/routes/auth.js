@@ -29,7 +29,7 @@ router.get('/github', (req, res) => {
   }
   const redirectUri = `${proto}://${host}/api/auth/github/callback`;
   const scope = 'read:user user:email';
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&prompt=select_account`;
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
 
   res.redirect(githubAuthUrl);
 });
