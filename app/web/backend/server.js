@@ -16,8 +16,8 @@ const server = http.createServer(app);
 // Trust proxy for secure headers behind Vercel / reverse proxies
 app.set('trust proxy', 1);
 
-const PORT = process.env.PORT || 5000;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const PORT = process.env.PORT || process.env.PUERTO || 5000;
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.URL_FRONTEND || (process.env.NODE_ENV === 'production' ? 'https://git-flow-nu.vercel.app' : 'http://localhost:5173');
 
 // -----------------------------------------------------------------------------
 // OWASP SECURITY HEADERS & DEFENSES

@@ -7,9 +7,9 @@ const { sendSecurityWelcomeEmail } = require('../utils/mailer');
 
 const router = express.Router();
 
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || 'Iv23liLMopydieglMr39';
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.URL_FRONTEND || 'https://git-flow-nu.vercel.app';
 
 /**
  * 1. GET /api/auth/github
