@@ -189,14 +189,14 @@ router.post('/demo-login', async (req, res) => {
       });
     }
 
-    // Fetch real GitHub public profile
+    // Fetch real GitHub public profile and verify account existence
     let ghAvatar = null;
     let ghName = null;
     let ghBio = null;
     try {
       const ghRes = await axios.get(`https://api.github.com/users/${cleanUsername}`, {
         headers: { 'User-Agent': 'GitFlow-Platform' },
-        timeout: 2500
+        timeout: 4000
       });
       if (ghRes.data) {
         ghAvatar = ghRes.data.avatar_url;
@@ -204,7 +204,13 @@ router.post('/demo-login', async (req, res) => {
         ghBio = ghRes.data.bio;
       }
     } catch (e) {
-      // User not yet on GitHub or public rate limit reached, use clean identicon fallback
+      // If GitHub explicitly responds 404 Not Found, reject fake or non-existent usernames
+      if (e.response && e.response.status === 404) {
+        return res.status(404).json({
+          error: `El usuario de GitHub '@${cleanUsername}' no existe en GitHub. Por favor verifica que el nombre de usuario sea válido.`
+        });
+      }
+      console.warn('[GitHub API Check]:', e.message);
     }
 
     const resolvedName = customName?.trim() || ghName || cleanUsername.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');

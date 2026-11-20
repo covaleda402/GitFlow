@@ -37,3 +37,7 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+# Security & Private Keys
+*.pem
+*.key
