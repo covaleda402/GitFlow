@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authenticateToken, optionalToken } = require('../middleware/auth');
+const { sendRoomCreatedEmail, sendRoomJoinedEmail } = require('../utils/mailer');
 
 const router = express.Router();
 
@@ -83,6 +84,32 @@ router.post('/projects', authenticateToken, async (req, res) => {
       INSERT INTO project_members (project_id, user_id, role)
       VALUES ($1, $2, 'OWNER')
     `, [project.id, req.user.id]);
+
+    // Send room created confirmation email asynchronously
+    const userEmail = req.user.email;
+    const roomInfo = db.getDynamicRoomCode(project.id, project.room_seed);
+    if (userEmail) {
+      sendRoomCreatedEmail({
+        email: userEmail,
+        username: req.user.username,
+        name: req.user.name,
+        projectName: project.name,
+        roomCode: roomInfo.code
+      }).catch(e => console.warn('[Room Created Mailer Warn]:', e.message));
+    } else {
+      db.query('SELECT email, name, username FROM users WHERE id = $1', [req.user.id])
+        .then(uRes => {
+          if (uRes.rows[0]?.email) {
+            sendRoomCreatedEmail({
+              email: uRes.rows[0].email,
+              username: uRes.rows[0].username,
+              name: uRes.rows[0].name,
+              projectName: project.name,
+              roomCode: roomInfo.code
+            }).catch(e => console.warn('[Room Created Mailer Warn]:', e.message));
+          }
+        }).catch(() => {});
+    }
 
     const io = req.app.get('socketio');
     if (io) {
@@ -359,6 +386,31 @@ router.post('/projects/join', authenticateToken, async (req, res) => {
       RETURNING *
     `;
     await db.query(addQuery, [matchedProject.id, req.user.id]);
+
+    // Send room joined confirmation email asynchronously
+    const joinEmail = req.user.email;
+    if (joinEmail) {
+      sendRoomJoinedEmail({
+        email: joinEmail,
+        username: req.user.username,
+        name: req.user.name,
+        projectName: matchedProject.name,
+        role: 'MEMBER'
+      }).catch(e => console.warn('[Room Joined Mailer Warn]:', e.message));
+    } else {
+      db.query('SELECT email, name, username FROM users WHERE id = $1', [req.user.id])
+        .then(uRes => {
+          if (uRes.rows[0]?.email) {
+            sendRoomJoinedEmail({
+              email: uRes.rows[0].email,
+              username: uRes.rows[0].username,
+              name: uRes.rows[0].name,
+              projectName: matchedProject.name,
+              role: 'MEMBER'
+            }).catch(e => console.warn('[Room Joined Mailer Warn]:', e.message));
+          }
+        }).catch(() => {});
+    }
 
     const io = req.app.get('socketio');
     if (io) {

@@ -131,6 +131,153 @@ Acceso a la plataforma: https://git-flow-nu.vercel.app/dashboard
   return { success: true, simulated: true };
 }
 
+/**
+ * GitFlow Room Created Notification Email
+ */
+async function sendRoomCreatedEmail({ email, username, name, projectName, roomCode }) {
+  if (!email || !email.includes('@')) return { success: false, error: 'Invalid email' };
+
+  const displayName = name || username || 'Líder de Sala';
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || 'GitFlow Security <onboarding@resend.dev>';
+  const subject = `🚀 Sala Creada Exitosamente: "${projectName}" en GitFlow`;
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Sala Creada - GitFlow</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #f1f5f9; padding: 24px; margin: 0;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #111827; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+    <div style="background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%); padding: 24px; text-align: center;">
+      <h1 style="margin: 0; color: #020617; font-size: 24px; font-weight: 800;">⚡ GitFlow</h1>
+      <p style="margin: 4px 0 0 0; color: #0f172a; font-size: 13px; font-weight: 600;">Confirmación de Creación de Sala Colaborativa</p>
+    </div>
+    <div style="padding: 28px 24px;">
+      <h2 style="margin-top: 0; color: #38bdf8; font-size: 20px;">¡Felicitaciones, ${displayName}! (@${username})</h2>
+      <p style="line-height: 1.6; color: #cbd5e1; font-size: 14px;">
+        Has creado con éxito la sala <strong>"${projectName}"</strong> en GitFlow y has sido asignado como <strong>👑 Líder y Administrador</strong> de la misma.
+      </p>
+      <div style="background-color: #0f172a; border-left: 4px solid #10b981; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
+        <h3 style="margin: 0 0 8px 0; color: #10b981; font-size: 14px; font-weight: 700;">🔐 Tu sala está protegida con código dinámico</h3>
+        <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.6;">
+          Los desarrolladores que deseen unirse deberán ingresar el código OTP que se genera en la cabecera de la sala (rota cada 5 minutos por seguridad criptográfica).
+        </p>
+        ${roomCode ? `<div style="margin-top: 12px; font-family: monospace; font-size: 18px; color: #38bdf8; background: #1e293b; padding: 8px 14px; border-radius: 6px; display: inline-block;">Código de acceso: <strong>${roomCode}</strong></div>` : ''}
+      </div>
+      <div style="text-align: center; margin: 28px 0 10px 0;">
+        <a href="https://git-flow-nu.vercel.app/dashboard" style="background-color: #06b6d4; color: #020617; padding: 12px 28px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 14px; display: inline-block;">
+          Gestionar mi Sala
+        </a>
+      </div>
+    </div>
+    <div style="background-color: #090d16; padding: 16px 24px; border-top: 1px solid #1e293b; text-align: center; font-size: 11px; color: #64748b;">
+      <p style="margin: 0;">Notificación automática de auditoría de GitFlow.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const textContent = `
+¡Felicitaciones ${displayName} (@${username})!
+Has creado con éxito la sala "${projectName}" en GitFlow como Líder de la sala.
+Ingresa al panel para gestionar tareas y telemetría: https://git-flow-nu.vercel.app/dashboard
+  `.trim();
+
+  if (resendApiKey) {
+    try {
+      const response = await axios.post('https://api.resend.com/emails', {
+        from: fromEmail, to: [email], subject, html: htmlContent, text: textContent
+      }, {
+        headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+        timeout: 8000
+      });
+      return { success: true, id: response.data?.id };
+    } catch (err) {
+      console.error('[Mailer Resend Error]:', err.response?.data || err.message);
+      return { success: false, error: err.response?.data || err.message, fallback: true };
+    }
+  }
+
+  console.log(`[Mailer DEV/INFO] Room created email queued for ${email} (pending RESEND_API_KEY): "${subject}"`);
+  return { success: true, simulated: true };
+}
+
+/**
+ * GitFlow Room Joined Notification Email
+ */
+async function sendRoomJoinedEmail({ email, username, name, projectName, role }) {
+  if (!email || !email.includes('@')) return { success: false, error: 'Invalid email' };
+
+  const displayName = name || username || 'Desarrollador';
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || 'GitFlow Security <onboarding@resend.dev>';
+  const subject = `🤝 Te has unido a la sala: "${projectName}" en GitFlow`;
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Bienvenido a la Sala - GitFlow</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #f1f5f9; padding: 24px; margin: 0;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #111827; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+    <div style="background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%); padding: 24px; text-align: center;">
+      <h1 style="margin: 0; color: #020617; font-size: 24px; font-weight: 800;">⚡ GitFlow</h1>
+      <p style="margin: 4px 0 0 0; color: #0f172a; font-size: 13px; font-weight: 600;">Notificación de Incorporación a Sala</p>
+    </div>
+    <div style="padding: 28px 24px;">
+      <h2 style="margin-top: 0; color: #38bdf8; font-size: 20px;">¡Hola, ${displayName}! (@${username})</h2>
+      <p style="line-height: 1.6; color: #cbd5e1; font-size: 14px;">
+        Te has incorporado exitosamente como <strong>💻 ${role || 'Miembro'}</strong> a la sala colaborativa <strong>"${projectName}"</strong>.
+      </p>
+      <div style="background-color: #0f172a; border-left: 4px solid #06b6d4; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
+        <h3 style="margin: 0 0 8px 0; color: #06b6d4; font-size: 14px; font-weight: 700;">📋 Tu Flujo de Trabajo en la Sala:</h3>
+        <ul style="margin: 0; padding-left: 20px; color: #94a3b8; font-size: 13px; line-height: 1.7;">
+          <li>Revisa las tareas en el tablero Kanban y selecciona las asignadas a tu usuario.</li>
+          <li>Cada commit que envíes a GitHub con la etiqueta de la tarea quedará registrado en la telemetría en vivo.</li>
+          <li>Al terminar tu código, pasa la tarea a QA para revisión y aprobación del Líder.</li>
+        </ul>
+      </div>
+      <div style="text-align: center; margin: 28px 0 10px 0;">
+        <a href="https://git-flow-nu.vercel.app/dashboard" style="background-color: #06b6d4; color: #020617; padding: 12px 28px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 14px; display: inline-block;">
+          Ver Tablero de la Sala
+        </a>
+      </div>
+    </div>
+    <div style="background-color: #090d16; padding: 16px 24px; border-top: 1px solid #1e293b; text-align: center; font-size: 11px; color: #64748b;">
+      <p style="margin: 0;">Notificación automática generada por GitFlow.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const textContent = `
+¡Hola ${displayName} (@${username})!
+Te has incorporado exitosamente a la sala "${projectName}" en GitFlow como ${role || 'Miembro'}.
+Ingresa al tablero para colaborar con tu equipo: https://git-flow-nu.vercel.app/dashboard
+  `.trim();
+
+  if (resendApiKey) {
+    try {
+      const response = await axios.post('https://api.resend.com/emails', {
+        from: fromEmail, to: [email], subject, html: htmlContent, text: textContent
+      }, {
+        headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+        timeout: 8000
+      });
+      return { success: true, id: response.data?.id };
+    } catch (err) {
+      console.error('[Mailer Resend Error]:', err.response?.data || err.message);
+      return { success: false, error: err.response?.data || err.message, fallback: true };
+    }
+  }
+
+  console.log(`[Mailer DEV/INFO] Room joined email queued for ${email} (pending RESEND_API_KEY): "${subject}"`);
+  return { success: true, simulated: true };
+}
+
 module.exports = {
-  sendSecurityWelcomeEmail
+  sendSecurityWelcomeEmail,
+  sendRoomCreatedEmail,
+  sendRoomJoinedEmail
 };
