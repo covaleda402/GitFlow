@@ -17,6 +17,9 @@ export default function GitHubLogin() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    if (params.get('logged_out') === 'true') {
+      setInfoNotice('Sesión cerrada con éxito. Puedes seleccionar otra cuenta de GitHub o ingresar con tu usuario.');
+    }
     if (params.get('notice') === 'github_oauth_unconfigured') {
       setInfoNotice('Para OAuth directo se requiere GITHUB_CLIENT_ID en Vercel/.env. Puedes ingresar directamente con tu usuario de GitHub y correo electrónico abajo.');
     }

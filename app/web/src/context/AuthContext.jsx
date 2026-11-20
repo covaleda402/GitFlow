@@ -94,9 +94,12 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('gitflow_token');
+    try {
+      sessionStorage.clear();
+    } catch (_) {}
     setToken(null);
     setUser(null);
-    window.location.href = '/login';
+    window.location.href = '/login?logged_out=true';
   };
 
   return (
