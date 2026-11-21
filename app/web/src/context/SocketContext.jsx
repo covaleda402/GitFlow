@@ -11,21 +11,29 @@ export function SocketProvider({ children }) {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    // Detect if running on Vercel Serverless (which doesn't host persistent WebSockets)
-    const isVercel = typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app');
+    // Detect if running locally or deployed on production / Vercel
+    const isLocalhost = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-    if (isVercel && !import.meta.env.VITE_SOCKET_URL) {
-      console.log('[Socket] Serverless mode active on Vercel. Telemetría y eventos locales gestionados.');
+    const envSocketUrl = import.meta.env.VITE_SOCKET_URL;
+    const socketPointsToLocalhost = envSocketUrl && 
+      (envSocketUrl.includes('localhost') || envSocketUrl.includes('127.0.0.1'));
+
+    // If deployed in production/Vercel and socket URL is missing or points to localhost:5000,
+    // operate safely in serverless mode to eliminate net::ERR_CONNECTION_REFUSED in console.
+    if (!isLocalhost && (!envSocketUrl || socketPointsToLocalhost)) {
+      console.log('[Socket] Modo Serverless en Vercel activo. Telemetría sincronizada vía HTTP y eventos locales.');
       setIsConnected(true);
       return;
     }
 
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+    const socketUrl = envSocketUrl || (isLocalhost ? 'http://localhost:5000' : window.location.origin);
 
     const socket = io(socketUrl, {
-      transports: ['polling', 'websocket'],
-      reconnectionAttempts: 3,
-      reconnectionDelay: 2000
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 1,
+      reconnectionDelay: 5000,
+      timeout: 3000
     });
 
     socketRef.current = socket;

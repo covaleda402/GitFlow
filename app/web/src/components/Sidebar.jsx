@@ -219,10 +219,12 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
         )}
       </div>
 
-      {/* Dynamic 5-minute security code widget */}
-      <div className="mb-4">
-        <DynamicSecurityCode projectId={projectId} />
-      </div>
+      {/* Dynamic 5-minute security code widget (only rendered if user has an active room) */}
+      {activeProjectId && (
+        <div className="mb-4">
+          <DynamicSecurityCode projectId={activeProjectId} />
+        </div>
+      )}
 
       {/* Navigation Items */}
       <nav className="flex-1 space-y-1">

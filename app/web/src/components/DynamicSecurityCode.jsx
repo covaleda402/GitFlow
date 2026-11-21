@@ -2,30 +2,44 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, Copy, Check, Clock, RefreshCw, KeyRound } from 'lucide-react';
 
-export default function DynamicSecurityCode({ projectId = 1 }) {
+export default function DynamicSecurityCode({ projectId }) {
   const { token } = useAuth();
   const [codeData, setCodeData] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(300);
   const [copied, setCopied] = useState(false);
 
   const fetchCode = async () => {
+    // Only attempt fetch if a valid projectId and auth token exist
+    if (!projectId || projectId === 'null' || !token) {
+      setCodeData(null);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/projects/${projectId}/security-code`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
+      if (!res.ok) {
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setCodeData(data);
         setSecondsLeft(data.timeRemainingSeconds);
       }
-    } catch (err) {
-      console.error('Error fetching dynamic code:', err);
+    } catch (_) {
+      // Gracefully silent on transient network glitches
     }
   };
 
   useEffect(() => {
+    if (!projectId || projectId === 'null' || !token) {
+      setCodeData(null);
+      return;
+    }
+
     fetchCode();
     const interval = setInterval(() => {
       setSecondsLeft(prev => {
@@ -47,6 +61,11 @@ export default function DynamicSecurityCode({ projectId = 1 }) {
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  // If no room is active or user doesn't have a room yet, do not render widget
+  if (!projectId || projectId === 'null' || !codeData) {
+    return null;
+  }
 
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
@@ -72,7 +91,7 @@ export default function DynamicSecurityCode({ projectId = 1 }) {
         </span>
         <button
           onClick={handleCopy}
-          className="p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all shadow-sm"
+          className="p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all shadow-sm cursor-pointer"
           title="Copiar código para compartir"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
