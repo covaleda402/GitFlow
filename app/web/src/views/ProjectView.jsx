@@ -36,7 +36,8 @@ import {
   Plus,
   Github,
   X,
-  KeyRound
+  KeyRound,
+  Lock
 } from 'lucide-react';
 
 export default function ProjectView() {
@@ -50,6 +51,7 @@ export default function ProjectView() {
   const navigate = useNavigate();
 
   const [project, setProject] = useState(null);
+  const [accessDenied, setAccessDenied] = useState(null);
   const [userRooms, setUserRooms] = useState([]);
 
   // Modals state
@@ -65,8 +67,10 @@ export default function ProjectView() {
   const [docSubTab, setDocSubTab] = useState('repository');
 
   useEffect(() => {
-    joinProject(projectId);
-  }, [projectId]);
+    if (!accessDenied) {
+      joinProject(projectId);
+    }
+  }, [projectId, accessDenied]);
 
   useEffect(() => {
     async function fetchProject() {
@@ -75,7 +79,19 @@ export default function ProjectView() {
         if (token) headers['Authorization'] = `Bearer ${token}`;
         const res = await fetch(`/api/projects/${projectId}`, { headers });
         const data = await res.json();
+
+        if (res.status === 403 || data.notMember) {
+          setAccessDenied({
+            notMember: true,
+            projectName: data.projectName || 'Sala Privada',
+            error: data.error || 'No perteneces a esta sala de desarrollo.'
+          });
+          setProject(null);
+          return;
+        }
+
         if (data.success) {
+          setAccessDenied(null);
           setProject(data.project);
         }
       } catch (err) {
@@ -255,7 +271,7 @@ export default function ProjectView() {
 
       {/* 2. Mobile Top Bar with Room Selector Modal Trigger */}
       <MobileTopBar 
-        projectName={project ? project.name : 'GitFlow'}
+        projectName={accessDenied ? (accessDenied.projectName || 'Sala Privada') : (project ? project.name : 'GitFlow')}
         onOpenRoomsModal={() => setIsMobileRoomsOpen(true)}
         onOpenCreateModal={() => setIsCreateOpen(true)}
         onOpenJoinModal={() => setIsJoinOpen(true)}
@@ -264,8 +280,46 @@ export default function ProjectView() {
       {/* 3. Main Project Working View Area */}
       <main className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full pb-24 md:pb-8">
         
-        {/* Project Header Banner & Connected Repos */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+        {accessDenied ? (
+          <div className="max-w-xl mx-auto my-12 p-8 rounded-3xl glass-panel border border-slate-200 dark:border-slate-800 bg-white dark:bg-dark-900/80 shadow-2xl text-center space-y-6 animate-fade-in">
+            <div className="w-16 h-16 mx-auto rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-lg shadow-amber-500/10">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-mono font-bold">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Sala Privada (OWASP A01)</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {accessDenied.projectName || 'Sala Privada'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                {accessDenied.error || 'No perteneces a esta sala. Para proteger el código y la telemetría, sus tareas y commits están restringidos a miembros autorizados.'}
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-center gap-3">
+              <button
+                onClick={() => setIsJoinOpen(true)}
+                className="py-2.5 px-5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4" />
+                <span>Unirse con Código (5 min)</span>
+              </button>
+
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="py-2.5 px-5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <span>Volver al Panel de Salas</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Project Header Banner & Connected Repos */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1 flex-wrap">
               <span>Salas</span>
@@ -511,21 +565,25 @@ export default function ProjectView() {
           {activeTab === 'analytics' && (
             <ContributionDashboard projectId={projectId} />
           )}
-        </div>
+            </div>
+          </>
+        )}
 
       </main>
 
       {/* 4. Mobile Bottom Navigation */}
       <MobileBottomNav 
-        projectId={projectId} 
+        projectId={accessDenied ? null : projectId} 
         onSimulatePush={handleSimulatePush} 
       />
 
-      {/* 5. Independent Room AI Chatbot */}
-      <RoomChatbot 
-        projectId={projectId} 
-        projectName={project ? project.name : 'GitFlow'} 
-      />
+      {/* 5. Independent Room AI Chatbot (Only active when inside an authorized room) */}
+      {!accessDenied && project && (
+        <RoomChatbot 
+          projectId={projectId} 
+          projectName={project.name || 'GitFlow'} 
+        />
+      )}
 
       {/* Modal: Connect Another Repository Autonomously */}
       {isAddRepoOpen && (

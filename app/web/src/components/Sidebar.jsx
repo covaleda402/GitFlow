@@ -60,17 +60,22 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const currentProject = projects.find(p => p.id === Number(projectId)) || { name: 'GitFlow Ecosystem' };
+  const hasProjects = projects.length > 0;
+  const matchedProject = projects.find(p => p.id === Number(projectId));
+  const activeProjectId = matchedProject ? matchedProject.id : (hasProjects ? projects[0].id : null);
+  const currentProject = matchedProject || (hasProjects ? projects[0] : { name: 'Sin salas asignadas' });
   const currentTab = new URLSearchParams(location.search).get('tab') || 'kanban';
+
+  const roomPath = (tab) => activeProjectId ? `/projects/${activeProjectId}?tab=${tab}` : '/dashboard';
 
   const navItems = [
     { label: 'Panel General (Hub)', tab: 'dashboard', path: '/dashboard', icon: GitBranch },
-    { label: 'Tablero Ágil', tab: 'kanban', path: `/projects/${projectId}?tab=kanban`, icon: Layers },
-    { label: 'Revisión Previa (QA)', tab: 'review', path: `/projects/${projectId}?tab=review`, icon: ShieldCheck },
-    { label: 'Documentos & Contexto', tab: 'documents', path: `/projects/${projectId}?tab=documents`, icon: FileText },
-    { label: 'Historial Terminado', tab: 'history', path: `/projects/${projectId}?tab=history`, icon: Archive },
-    { label: 'Telemetría y Respaldo', tab: 'telemetry', path: `/projects/${projectId}?tab=telemetry`, icon: Radio },
-    { label: 'Analítica de Sala', tab: 'analytics', path: `/projects/${projectId}?tab=analytics`, icon: BarChart3 },
+    { label: 'Tablero Ágil', tab: 'kanban', path: roomPath('kanban'), icon: Layers },
+    { label: 'Revisión Previa (QA)', tab: 'review', path: roomPath('review'), icon: ShieldCheck },
+    { label: 'Documentos & Contexto', tab: 'documents', path: roomPath('documents'), icon: FileText },
+    { label: 'Historial Terminado', tab: 'history', path: roomPath('history'), icon: Archive },
+    { label: 'Telemetría y Respaldo', tab: 'telemetry', path: roomPath('telemetry'), icon: Radio },
+    { label: 'Analítica de Sala', tab: 'analytics', path: roomPath('analytics'), icon: BarChart3 },
     { label: 'Mi Perfil', tab: 'profile', path: '/profile', icon: User }
   ];
 

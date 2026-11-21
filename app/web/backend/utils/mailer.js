@@ -96,7 +96,16 @@ Políticas de Seguridad y Normas de Uso:
 Acceso a la plataforma: https://git-flow-nu.vercel.app/dashboard
   `.trim();
 
+  // In test environment or test domains, avoid hitting live Resend API limits
+  if (process.env.NODE_ENV === 'test' || email.endsWith('@example.com')) {
+    return { success: true, simulated: true, id: 'test-mock-resend-id' };
+  }
+
   // If Resend API key is provided, send through Resend HTTP API
+  if (process.env.NODE_ENV === 'test' || email.endsWith('@example.com')) {
+    return { success: true, simulated: true, id: 'test-mock-room-created-id' };
+  }
+
   if (resendApiKey) {
     try {
       const response = await axios.post(
@@ -121,6 +130,7 @@ Acceso a la plataforma: https://git-flow-nu.vercel.app/dashboard
       return { success: true, id: response.data?.id };
     } catch (err) {
       console.error('[Mailer Resend Error]:', err.response?.data || err.message);
+      // Don't throw: fallback cleanly
       return { success: false, error: err.response?.data || err.message, fallback: true };
     }
   }
@@ -182,6 +192,10 @@ async function sendRoomCreatedEmail({ email, username, name, projectName, roomCo
 Has creado con éxito la sala "${projectName}" en GitFlow como Líder de la sala.
 Ingresa al panel para gestionar tareas y telemetría: https://git-flow-nu.vercel.app/dashboard
   `.trim();
+
+  if (process.env.NODE_ENV === 'test' || email.endsWith('@example.com')) {
+    return { success: true, simulated: true, id: 'test-mock-room-created-id' };
+  }
 
   if (resendApiKey) {
     try {
@@ -255,6 +269,10 @@ async function sendRoomJoinedEmail({ email, username, name, projectName, role })
 Te has incorporado exitosamente a la sala "${projectName}" en GitFlow como ${role || 'Miembro'}.
 Ingresa al tablero para colaborar con tu equipo: https://git-flow-nu.vercel.app/dashboard
   `.trim();
+
+  if (process.env.NODE_ENV === 'test' || email.endsWith('@example.com')) {
+    return { success: true, simulated: true, id: 'test-mock-room-created-id' };
+  }
 
   if (resendApiKey) {
     try {

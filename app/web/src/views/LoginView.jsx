@@ -8,6 +8,13 @@ export default function LoginView() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('logged_out') === 'true') {
+      localStorage.removeItem('gitflow_token');
+      try { sessionStorage.clear(); } catch (_) {}
+      return;
+    }
+
     if (isAuthenticated && !loading) {
       navigate('/dashboard');
     }

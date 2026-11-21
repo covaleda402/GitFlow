@@ -268,7 +268,7 @@ export default function ProfileView() {
       
       {/* Desktop Sidebar (Left) */}
       <Sidebar 
-        projectId={1}
+        projectId={null}
         onOpenCreateRoom={() => setCreateModalOpen(true)}
         onOpenJoinRoom={() => setJoinModalOpen(true)}
         onSimulatePush={() => {}}
@@ -541,7 +541,7 @@ export default function ProfileView() {
       </main>
 
       {/* Mobile Bottom Navigation (TikTok style) */}
-      <MobileBottomNav projectId={1} onSimulatePush={() => {}} />
+      <MobileBottomNav projectId={null} onSimulatePush={() => {}} />
 
       {/* Modals */}
       <CreateRoomModal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} onCreated={() => {}} />

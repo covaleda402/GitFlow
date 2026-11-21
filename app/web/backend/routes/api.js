@@ -128,12 +128,51 @@ router.post('/projects', authenticateToken, async (req, res) => {
 });
 
 /**
+ * Helper to enforce that the requester is the OWNER or an accepted MEMBER of the room (OWASP A01)
+ */
+async function getRoomAccess(projectId, reqUser) {
+  if (!reqUser) return { hasAccess: false, notMember: true, isOwner: false };
+  const projRes = await db.query(
+    "SELECT id, name, owner_id, status FROM projects WHERE id = $1 AND (status IS NULL OR status != 'DELETED')",
+    [projectId]
+  );
+  if (projRes.rows.length === 0) return { hasAccess: false, notFound: true };
+  const project = projRes.rows[0];
+  if (project.owner_id === reqUser.id) {
+    return { hasAccess: true, isOwner: true, role: 'OWNER', project };
+  }
+  const memberRes = await db.query(
+    'SELECT role FROM project_members WHERE project_id = $1 AND user_id = $2',
+    [projectId, reqUser.id]
+  );
+  if (memberRes.rows.length > 0) {
+    return { hasAccess: true, isOwner: false, role: memberRes.rows[0].role, project };
+  }
+  return { hasAccess: false, notMember: true, isOwner: false, project };
+}
+
+/**
  * GET /api/projects/:id
  * Returns single room details, owner info and list of members
  */
 router.get('/projects/:id', optionalToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
+    const access = await getRoomAccess(projectId, req.user);
+
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({
+        error: 'Esta sala es privada y requiere autorización de membresía o un código de acceso temporal de 5 minutos.',
+        notMember: true,
+        projectId: access.project ? access.project.id : projectId,
+        projectName: access.project ? access.project.name : 'Sala Privada'
+      });
+    }
+
     const query = `
       SELECT p.*, u.username as owner_username, COALESCE(u.custom_avatar, u.avatar_url) as owner_avatar
       FROM projects p
@@ -141,11 +180,6 @@ router.get('/projects/:id', optionalToken, async (req, res) => {
       WHERE p.id = $1
     `;
     const result = await db.query(query, [projectId]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Sala no encontrada.' });
-    }
-
     const project = result.rows[0];
 
     // Fetch members of this room
@@ -159,9 +193,7 @@ router.get('/projects/:id', optionalToken, async (req, res) => {
     `;
     const membersRes = await db.query(membersQuery, [projectId]);
 
-    const currentUserId = req.user ? req.user.id : null;
-    const isOwner = project.owner_id === currentUserId;
-
+    const isOwner = access.isOwner;
     const rawRepo = project.github_repo || 'edwin-esquivel-ADSO/GitFlow';
     const reposList = rawRepo.split(',').map(r => r.trim()).filter(Boolean);
     const github_repos = reposList.length > 0 ? reposList : ['edwin-esquivel-ADSO/GitFlow'];
@@ -171,6 +203,7 @@ router.get('/projects/:id', optionalToken, async (req, res) => {
       project: {
         ...project,
         isOwner,
+        userRole: access.role,
         github_repos,
         members: membersRes.rows
       }
@@ -443,11 +476,22 @@ router.post('/projects/join', authenticateToken, async (req, res) => {
 router.get('/projects/:id/tasks', optionalToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
-    const userId = req.user ? req.user.id : null;
+    const access = await getRoomAccess(projectId, req.user);
 
-    // Check if user is owner
-    const projRes = await db.query('SELECT owner_id FROM projects WHERE id = $1', [projectId]);
-    const isOwner = projRes.rows.length > 0 && userId && projRes.rows[0].owner_id === userId;
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({
+        error: 'No perteneces a esta sala.',
+        notMember: true,
+        tasks: []
+      });
+    }
+
+    const userId = req.user ? req.user.id : null;
+    const isOwner = access.isOwner;
 
     const scope = req.query.scope;
     let tasksQuery;
@@ -729,10 +773,22 @@ router.post('/tasks/:id/commit', optionalToken, async (req, res) => {
 router.get('/projects/:id/history', optionalToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
-    const userId = req.user ? req.user.id : null;
+    const access = await getRoomAccess(projectId, req.user);
 
-    const projRes = await db.query('SELECT owner_id FROM projects WHERE id = $1', [projectId]);
-    const isOwner = projRes.rows.length > 0 && userId && projRes.rows[0].owner_id === userId;
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({
+        error: 'No perteneces a esta sala.',
+        notMember: true,
+        tasks: []
+      });
+    }
+
+    const userId = req.user ? req.user.id : null;
+    const isOwner = access.isOwner;
 
     let query;
     let params;
@@ -782,6 +838,21 @@ router.get('/projects/:id/history', optionalToken, async (req, res) => {
 router.get('/projects/:id/documents', optionalToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
+    const access = await getRoomAccess(projectId, req.user);
+
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({
+        error: 'No perteneces a esta sala.',
+        notMember: true,
+        documents: [],
+        folders: {}
+      });
+    }
+
     const query = `
       SELECT d.*, u.username as author_username, u.name as author_name
       FROM project_documents d
@@ -990,6 +1061,18 @@ router.patch('/users/profile/me', authenticateToken, async (req, res) => {
 router.get('/projects/:id/dashboard', optionalToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
+    const access = await getRoomAccess(projectId, req.user);
+
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({
+        error: 'No perteneces a esta sala.',
+        notMember: true
+      });
+    }
 
     const tasksRes = await db.query(`
       SELECT status, COUNT(*) as count 
@@ -1065,6 +1148,19 @@ router.get('/users', optionalToken, async (req, res) => {
 router.post('/projects/:id/chatbot', optionalToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
+    const access = await getRoomAccess(projectId, req.user);
+
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({
+        error: 'No perteneces a esta sala.',
+        notMember: true
+      });
+    }
+
     const { message } = req.body;
 
     if (!message || message.trim() === '') {
@@ -1230,6 +1326,20 @@ router.post('/projects/:id/chatbot', optionalToken, async (req, res) => {
 router.get('/projects/:id/commit-health', optionalToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id, 10);
+    const access = await getRoomAccess(projectId, req.user);
+
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({
+        error: 'No perteneces a esta sala.',
+        notMember: true,
+        commits: []
+      });
+    }
+
     const commitsRes = await db.query('SELECT * FROM commits WHERE project_id = $1 ORDER BY timestamp DESC', [projectId]);
     const commits = commitsRes.rows;
 
