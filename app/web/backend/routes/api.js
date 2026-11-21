@@ -63,11 +63,17 @@ router.post('/projects', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'El nombre de la sala es obligatorio.' });
     }
 
+    const cleanRepoName = (r) => String(r || '').trim()
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/^git@github\.com:/i, '')
+      .replace(/\.git$/i, '')
+      .replace(/^\/+|\/+$/g, '');
+
     let finalRepo = 'edwin-esquivel-ADSO/GitFlow';
     if (Array.isArray(github_repos) && github_repos.length > 0) {
-      finalRepo = github_repos.filter(Boolean).map(r => r.trim()).join(', ');
+      finalRepo = github_repos.map(cleanRepoName).filter(Boolean).join(', ');
     } else if (github_repo && github_repo.trim()) {
-      finalRepo = github_repo.trim();
+      finalRepo = cleanRepoName(github_repo);
     }
 
     const defaultMarkdown = context_markdown || `# ${name}\n\nDocumenta aquí las decisiones técnicas, arquitectura y requerimientos de esta sala.`;
@@ -225,7 +231,11 @@ router.post('/projects/:id/repos', optionalToken, async (req, res) => {
     if (!repo || !repo.trim()) {
       return res.status(400).json({ error: 'El nombre del repositorio es requerido (ej. usuario/repositorio).' });
     }
-    const cleanRepo = repo.trim().replace(/^https?:\/\/github\.com\//, '');
+    const cleanRepo = repo.trim()
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/^git@github\.com:/i, '')
+      .replace(/\.git$/i, '')
+      .replace(/^\/+|\/+$/g, '');
     const projRes = await db.query('SELECT github_repo FROM projects WHERE id = $1', [projectId]);
     if (projRes.rows.length === 0) {
       return res.status(404).json({ error: 'Sala no encontrada.' });

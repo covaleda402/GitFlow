@@ -29,12 +29,21 @@ export default function CreateRoomModal({ isOpen, onClose, onCreated }) {
     setRepos(prev => prev.filter((_, i) => i !== index));
   };
 
+  const cleanRepoInput = (str) => {
+    return String(str || '')
+      .trim()
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/^git@github\.com:/i, '')
+      .replace(/\.git$/i, '')
+      .replace(/^\/+|\/+$/g, '');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const validRepos = repos.map(r => r.trim()).filter(Boolean);
+    const validRepos = repos.map(cleanRepoInput).filter(Boolean);
     if (validRepos.length === 0) {
       setError('Debes ingresar al menos un repositorio de GitHub.');
       setLoading(false);

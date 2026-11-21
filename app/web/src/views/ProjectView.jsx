@@ -371,20 +371,28 @@ export default function ProjectView() {
                   <span>{connectedRepos.length > 1 ? 'Repositorios Conectados:' : 'Repositorio:'}</span>
                 </span>
 
-                {connectedRepos.map((repoName, idx) => (
-                  <a
-                    key={idx}
-                    href={`https://github.com/${repoName}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-normal text-slate-700 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-brand-cyan flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-dark-900 border border-slate-200 dark:border-slate-700 transition-colors group"
-                    title={`Abrir repositorio ${repoName} en GitHub`}
-                  >
-                    <GitBranch className="w-3 h-3 text-cyan-600 dark:text-brand-cyan" />
-                    <span className="font-mono">{repoName}</span>
-                    <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-brand-cyan" />
-                  </a>
-                ))}
+                {connectedRepos.map((repoName, idx) => {
+                  const cleanRepo = String(repoName || '')
+                    .trim()
+                    .replace(/^https?:\/\/github\.com\//i, '')
+                    .replace(/^git@github\.com:/i, '')
+                    .replace(/\.git$/i, '')
+                    .replace(/^\/+|\/+$/g, '');
+                  return (
+                    <a
+                      key={idx}
+                      href={`https://github.com/${cleanRepo}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-normal text-slate-700 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-brand-cyan flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-dark-900 border border-slate-200 dark:border-slate-700 transition-colors group"
+                      title={`Abrir repositorio ${cleanRepo} en GitHub`}
+                    >
+                      <GitBranch className="w-3 h-3 text-cyan-600 dark:text-brand-cyan" />
+                      <span className="font-mono">{cleanRepo}</span>
+                      <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-brand-cyan" />
+                    </a>
+                  );
+                })}
 
                 <button
                   type="button"

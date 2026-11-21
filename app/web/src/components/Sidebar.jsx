@@ -68,6 +68,16 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
 
   const roomPath = (tab) => activeProjectId ? `/projects/${activeProjectId}?tab=${tab}` : '/dashboard';
 
+  const cleanRepoDisplay = (repoStr) => {
+    if (!repoStr) return 'edwin-esquivel-ADSO/GitFlow';
+    const first = repoStr.split(',')[0].trim();
+    return first
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/^git@github\.com:/i, '')
+      .replace(/\.git$/i, '')
+      .replace(/^\/+|\/+$/g, '');
+  };
+
   const navItems = [
     { label: 'Panel General (Hub)', tab: 'dashboard', path: '/dashboard', icon: GitBranch },
     { label: 'Tablero Ágil', tab: 'kanban', path: roomPath('kanban'), icon: Layers },
@@ -151,7 +161,7 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
           <div className="truncate pr-2">
             <span className="font-bold block truncate">{currentProject.name}</span>
             <span className="text-[10px] text-slate-400 font-mono block truncate">
-              {currentProject.github_repo ? currentProject.github_repo.split(',')[0] : 'edwin-esquivel-ADSO/GitFlow'}
+              {cleanRepoDisplay(currentProject.github_repo)}
             </span>
           </div>
           <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${dropdownOpen ? 'rotate-180 text-brand-cyan' : ''}`} />
@@ -185,7 +195,7 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
                     </div>
                     {p.github_repo && (
                       <span className="text-[10px] text-slate-400 font-mono block truncate">
-                        {p.github_repo.split(',')[0]}
+                        {cleanRepoDisplay(p.github_repo)}
                       </span>
                     )}
                   </div>
