@@ -552,7 +552,7 @@ export default function ProjectView() {
               </div>
 
               {docSubTab === 'repository' ? (
-                <ProjectDocuments projectId={projectId} />
+                <ProjectDocuments projectId={projectId} isOwner={Boolean(project?.isOwner)} />
               ) : (
                 <LiveContextEditor projectId={projectId} />
               )}
@@ -608,7 +608,7 @@ export default function ProjectView() {
             </div>
 
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Agrega repositorios adicionales conectados entre sí (ej. un repositorio para el frontend y otro para el backend, como en el proyecto de Jesús Ariel).
+              Agrega repositorios adicionales conectados entre sí (ej. un repositorio para el frontend y otro para el backend).
             </p>
 
             <form onSubmit={handleAddRepository} className="space-y-3.5">
@@ -683,9 +683,6 @@ export default function ProjectView() {
                         {r.github_repo ? r.github_repo.split(',')[0] : 'edwin-esquivel-ADSO/GitFlow'}
                       </span>
                     </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200/50 dark:bg-slate-800 text-slate-500">
-                      #{r.id}
-                    </span>
                   </button>
                 );
               })}

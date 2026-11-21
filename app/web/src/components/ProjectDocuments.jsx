@@ -4,100 +4,28 @@ import { useUIFeedback } from '../context/UIFeedbackContext';
 import { 
   Folder, 
   FileText, 
-  FileCode, 
-  Image as ImageIcon, 
   ExternalLink, 
   Plus, 
   Eye, 
   X, 
-  Save, 
   BookOpen,
   ZoomIn,
   ZoomOut,
   Maximize2,
-  Calendar,
-  User,
   Search,
-  UploadCloud
+  UploadCloud,
+  Edit2,
+  Trash2,
+  Lock
 } from 'lucide-react';
 
-const INITIAL_DOCS = [
-  {
-    id: 1,
-    folder_name: 'Arquitectura',
-    title: 'Diagrama de Flujo y Microservicios',
-    file_type: 'md',
-    file_url: '',
-    content_markdown: '# Arquitectura del Ecosistema GitFlow\n\n## Servicios Principales:\n1. Ingestión de Webhooks con Regex Parser.\n2. Conexiones Socket.io con salas por proyecto.\n3. Base de Datos Neon PostgreSQL con Prepared Statements.\n4. Rotación criptográfica de códigos de 5 minutos.',
-    author_username: 'edwin-esquivel',
-    created_at: '2026-11-01T10:00:00Z'
-  },
-  {
-    id: 2,
-    folder_name: 'Arquitectura',
-    title: 'Guía de Despliegue en Vercel Monorepo',
-    file_type: 'pdf',
-    file_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-    content_markdown: '',
-    author_username: 'edwin-esquivel',
-    created_at: '2026-11-02T10:00:00Z'
-  },
-  {
-    id: 3,
-    folder_name: 'Diseño & UX',
-    title: 'Mockup de Navegación Móvil TikTok Style',
-    file_type: 'img',
-    file_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-    content_markdown: '',
-    author_username: 'alex-coder',
-    created_at: '2026-11-03T10:00:00Z'
-  },
-  {
-    id: 4,
-    folder_name: 'Diseño & UX',
-    title: 'Especificaciones de Paleta de Colores y Contrastes',
-    file_type: 'docx',
-    file_url: 'https://calibre-ebook.com/downloads/demos/demo.docx',
-    content_markdown: '',
-    author_username: 'alex-coder',
-    created_at: '2026-11-03T11:00:00Z'
-  },
-  {
-    id: 5,
-    folder_name: 'Reuniones & Notas',
-    title: 'Minuta de Kickoff y Roles OMNICODE',
-    file_type: 'md',
-    file_url: '',
-    content_markdown: '# Minuta de Kickoff OMNICODE\n\n- **A00**: Orquestador General.\n- **A03/A05**: Product Owner y UX.\n- **A06/A10**: Arquitecto y DBA.\n- **Desarrollador Principal**: Edwin Esquivel.',
-    author_username: 'maria-dev',
-    created_at: '2026-11-04T10:00:00Z'
-  },
-  {
-    id: 6,
-    folder_name: 'Documentación General',
-    title: 'Manual de Vinculación de GitHub OAuth y Webhooks',
-    file_type: 'md',
-    file_url: '',
-    content_markdown: '# Guía de Vinculación GitHub\n\nConfiguración paso a paso de Client ID, Secret y endpoint receptor de commits.',
-    author_username: 'edwin-esquivel',
-    created_at: '2026-11-05T09:00:00Z'
-  },
-  {
-    id: 7,
-    folder_name: 'Diseño & UX',
-    title: 'Wireframes de Tablero Ágil y Chatbot',
-    file_type: 'img',
-    file_url: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=1200&q=80',
-    content_markdown: '',
-    author_username: 'maria-dev',
-    created_at: '2026-11-05T14:00:00Z'
-  }
-];
-
-export default function ProjectDocuments({ projectId = 1 }) {
-  const { token } = useAuth();
-  const { showToast } = useUIFeedback();
-  const [documents, setDocuments] = useState(INITIAL_DOCS);
+export default function ProjectDocuments({ projectId = 1, isOwner = false }) {
+  const { token, user } = useAuth();
+  const { showToast, confirm } = useUIFeedback();
+  
+  // Isolated room documents state (zero mock leakage across rooms)
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedFolder, setSelectedFolder] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -107,7 +35,7 @@ export default function ProjectDocuments({ projectId = 1 }) {
   const [imageZoom, setImageZoom] = useState(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // New Document form
+  // New Document form state
   const [newTitle, setNewTitle] = useState('');
   const [newFolder, setNewFolder] = useState('Arquitectura');
   const [newType, setNewType] = useState('md');
@@ -116,7 +44,47 @@ export default function ProjectDocuments({ projectId = 1 }) {
   const [submitting, setSubmitting] = useState(false);
   const [uploadingCloudinary, setUploadingCloudinary] = useState(false);
 
-  const handleCloudinaryDocUpload = async (e) => {
+  // Edit Document form state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingDocId, setEditingDocId] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editFolder, setEditFolder] = useState('Arquitectura');
+  const [editType, setEditType] = useState('md');
+  const [editUrl, setEditUrl] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  // Load room documents strictly scoped to this projectId
+  const loadDocuments = async () => {
+    try {
+      setLoading(true);
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      const res = await fetch(`/api/projects/${projectId}/documents`, { headers });
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.documents)) {
+        setDocuments(data.documents);
+      } else {
+        setDocuments([]);
+      }
+    } catch (err) {
+      console.error('Error fetching project documents:', err);
+      setDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (projectId) {
+      loadDocuments();
+    }
+  }, [projectId, token]);
+
+  // Upload attachment to Cloudinary (for new document)
+  const handleCloudinaryDocUpload = async (e, isEdit = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -138,13 +106,17 @@ export default function ProjectDocuments({ projectId = 1 }) {
           body: JSON.stringify({
             file: reader.result,
             folder: 'documents',
-            tag: newType
+            tag: isEdit ? editType : newType
           })
         });
 
         const data = await res.json();
         if (res.ok && data.url) {
-          setNewUrl(data.url);
+          if (isEdit) {
+            setEditUrl(data.url);
+          } else {
+            setNewUrl(data.url);
+          }
           showToast('Archivo subido con éxito a Cloudinary.', 'success');
         } else {
           showToast(data.error || 'Error al subir archivo a Cloudinary.', 'error');
@@ -159,77 +131,149 @@ export default function ProjectDocuments({ projectId = 1 }) {
     reader.readAsDataURL(file);
   };
 
-  const loadDocuments = async () => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/documents`);
-      const data = await res.json();
-      if (data.success && data.documents && data.documents.length > 0) {
-        setDocuments(data.documents);
-      }
-    } catch (err) {
-      console.error('Error fetching project documents:', err);
-    }
-  };
-
-  useEffect(() => {
-    loadDocuments();
-  }, [projectId]);
-
+  // Create new document (Any room member)
   const handleCreateDoc = async (e) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
     setSubmitting(true);
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`/api/projects/${projectId}/documents`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
           folder_name: newFolder,
-          title: newTitle,
+          title: newTitle.trim(),
           file_type: newType,
-          file_url: newUrl,
+          file_url: newUrl.trim(),
           content_markdown: newContent
         })
       });
 
       const data = await res.json();
       if (res.ok && data.document) {
-        setDocuments(prev => [...prev, data.document]);
+        setDocuments(prev => [data.document, ...prev]);
+        showToast('Documento guardado con éxito.', 'success');
+        setIsAddModalOpen(false);
+        setNewTitle('');
+        setNewUrl('');
+        setNewContent('');
       } else {
-        // Fallback local append
-        const localDoc = {
-          id: Date.now(),
-          folder_name: newFolder,
-          title: newTitle,
-          file_type: newType,
-          file_url: newUrl,
-          content_markdown: newContent,
-          author_username: 'edwin-esquivel',
-          created_at: new Date().toISOString()
-        };
-        setDocuments(prev => [...prev, localDoc]);
+        showToast(data.error || 'Error al registrar documento.', 'error');
       }
-
-      setIsAddModalOpen(false);
-      setNewTitle('');
-      setNewUrl('');
-      setNewContent('');
     } catch (err) {
       console.error('Error creating document:', err);
+      showToast('Error al conectar con el servidor.', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Extract unique folders and compute counts
+  // Open edit modal
+  const handleOpenEditModal = (doc) => {
+    setEditingDocId(doc.id);
+    setEditTitle(doc.title || '');
+    setEditFolder(doc.folder_name || 'Arquitectura');
+    setEditType(doc.file_type || 'md');
+    setEditUrl(doc.file_url || '');
+    setEditContent(doc.content_markdown || '');
+    setIsEditModalOpen(true);
+  };
+
+  // Submit edit document (Any room member or leader)
+  const handleUpdateDoc = async (e) => {
+    e.preventDefault();
+    if (!editTitle.trim() || !editingDocId) return;
+
+    setEditSubmitting(true);
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`/api/projects/${projectId}/documents/${editingDocId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          folder_name: editFolder,
+          title: editTitle.trim(),
+          file_type: editType,
+          file_url: editUrl.trim(),
+          content_markdown: editContent
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.document) {
+        setDocuments(prev => prev.map(d => d.id === editingDocId ? data.document : d));
+        showToast('Documento actualizado correctamente.', 'success');
+        setIsEditModalOpen(false);
+        if (activeDocModal && activeDocModal.id === editingDocId) {
+          setActiveDocModal(data.document);
+        }
+      } else {
+        showToast(data.error || 'Error al actualizar documento.', 'error');
+      }
+    } catch (err) {
+      console.error('Error updating document:', err);
+      showToast('Error al conectar con el servidor.', 'error');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  // Delete document (STRICTLY RESTRICTED TO ROOM LEADER / OWNER)
+  const handleDeleteDoc = async (doc) => {
+    if (!isOwner) {
+      showToast('Permiso denegado: Solo el líder de la sala puede eliminar documentos.', 'error');
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: '¿Eliminar documento de la sala?',
+      message: `¿Estás seguro de que deseas eliminar permanentemente el documento "${doc.title}"? Esta acción no se puede deshacer.`,
+      confirmText: 'Sí, eliminar',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`/api/projects/${projectId}/documents/${doc.id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDocuments(prev => prev.filter(d => d.id !== doc.id));
+        showToast('Documento eliminado con éxito.', 'success');
+        if (activeDocModal && activeDocModal.id === doc.id) {
+          setActiveDocModal(null);
+        }
+        if (activeImageModal && activeImageModal.id === doc.id) {
+          setActiveImageModal(null);
+        }
+      } else {
+        showToast(data.error || 'No fue posible eliminar el archivo.', 'error');
+      }
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      showToast('Error de conexión al eliminar el archivo.', 'error');
+    }
+  };
+
+  // Folder categories
   const folderCategories = [
     { name: 'Arquitectura', icon: '📐' },
     { name: 'Diseño & UX', icon: '🎨' },
-    { name: 'Reuniones & Notas', icon: '📝' },
+    { name: 'Reuniones & Notas', icon: '📋' },
     { name: 'Documentación General', icon: '📚' }
   ];
 
@@ -259,7 +303,7 @@ export default function ProjectDocuments({ projectId = 1 }) {
   return (
     <div className="w-full space-y-6">
       
-      {/* 1. Header Bar: Aligned horizontally, buttons on the same line */}
+      {/* 1. Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl glass-panel border border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-brand-violet/15 text-brand-violet border border-brand-violet/25 shrink-0">
@@ -273,12 +317,12 @@ export default function ProjectDocuments({ projectId = 1 }) {
               </span>
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400">
-              Archivos y notas técnicas organizadas en carpetas con soporte para Markdown, PDF, Word e Imágenes.
+              Archivos y notas técnicas de la sala. Edición abierta a integrantes; eliminación exclusiva del líder.
             </p>
           </div>
         </div>
 
-        {/* Action Button: Aligned in same row */}
+        {/* Action Button */}
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           <button
             onClick={() => setIsAddModalOpen(true)}
@@ -294,7 +338,7 @@ export default function ProjectDocuments({ projectId = 1 }) {
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <span className="text-xs font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
-            Carpetas del Proyecto
+            Carpetas de la Sala
           </span>
           {/* Quick search input */}
           <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-dark-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs">
@@ -359,101 +403,149 @@ export default function ProjectDocuments({ projectId = 1 }) {
       </div>
 
       {/* 3. Files Grid View */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredDocs.map((doc) => (
-          <div
-            key={doc.id}
-            className="p-4 rounded-2xl glass-card border border-slate-200 dark:border-slate-800 hover:border-brand-cyan/40 transition-all flex flex-col justify-between group shadow-sm"
+      {loading ? (
+        <div className="p-12 text-center rounded-2xl border border-slate-200 dark:border-slate-800 font-mono text-xs text-slate-400">
+          Cargando documentos de la sala...
+        </div>
+      ) : filteredDocs.length === 0 ? (
+        <div className="col-span-full p-10 text-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-white/50 dark:bg-dark-900/50">
+          <BookOpen className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
+            {documents.length === 0 ? 'Esta sala aún no tiene documentos' : 'No hay documentos en esta carpeta'}
+          </h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-4">
+            {documents.length === 0 
+              ? 'Sube notas técnicas, especificaciones de arquitectura, diagramas o manuales con el botón "Nuevo Documento". Los archivos quedan aislados exclusivamente para esta sala.'
+              : 'Selecciona "Todas las Carpetas" o añade un nuevo documento en esta categoría.'}
+          </p>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-cyan text-dark-950 hover:bg-cyan-300 transition-all font-mono"
           >
-            <div>
-              {/* Card Header: Folder tag & file type badge */}
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium">
-                  <Folder className="w-3.5 h-3.5 text-brand-violet" />
-                  {doc.folder_name}
-                </span>
-                {getFileBadge(doc.file_type)}
+            <Plus className="w-3.5 h-3.5" />
+            <span>Crear Primer Documento</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredDocs.map((doc) => (
+            <div
+              key={doc.id}
+              className="p-4 rounded-2xl glass-card border border-slate-200 dark:border-slate-800 hover:border-brand-cyan/40 transition-all flex flex-col justify-between group shadow-sm bg-white dark:bg-dark-900"
+            >
+              <div>
+                {/* Card Header: Folder tag & file type badge */}
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium">
+                    <Folder className="w-3.5 h-3.5 text-brand-violet" />
+                    {doc.folder_name}
+                  </span>
+                  {getFileBadge(doc.file_type)}
+                </div>
+
+                {/* Title */}
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-brand-cyan transition-colors mb-2 leading-snug">
+                  {doc.title}
+                </h4>
+
+                {/* Text content snippet for Markdown */}
+                {doc.content_markdown && (
+                  <p className="text-[11px] font-mono text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed bg-slate-50 dark:bg-dark-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800/80 mb-3">
+                    {doc.content_markdown}
+                  </p>
+                )}
+
+                {/* Image Preview */}
+                {doc.file_type === 'img' && doc.file_url && (
+                  <div 
+                    onClick={() => {
+                      setActiveImageModal(doc);
+                      setImageZoom(1);
+                    }}
+                    className="mb-3 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 h-36 bg-slate-100 dark:bg-dark-950 relative cursor-pointer group/img"
+                  >
+                    <img
+                      src={doc.file_url}
+                      alt={doc.title}
+                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-dark-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white font-mono text-xs font-semibold">
+                      <Maximize2 className="w-4 h-4 text-brand-cyan" />
+                      <span>Ampliar / Zoom</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Title */}
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-brand-cyan transition-colors mb-2 leading-snug">
-                {doc.title}
-              </h4>
+              {/* Bottom Actions & Author */}
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs gap-2">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[90px]">
+                  @{doc.author_username || 'dev'}
+                </span>
 
-              {/* Text content snippet for Markdown */}
-              {doc.content_markdown && (
-                <p className="text-[11px] font-mono text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed bg-slate-50 dark:bg-dark-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800/80 mb-3">
-                  {doc.content_markdown}
-                </p>
-              )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* View action */}
+                  {doc.file_type === 'md' ? (
+                    <button
+                      onClick={() => setActiveDocModal(doc)}
+                      className="flex items-center gap-1 text-[11px] font-bold text-cyan-600 dark:text-brand-cyan hover:underline"
+                      title="Leer documento"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Leer</span>
+                    </button>
+                  ) : doc.file_type === 'img' ? (
+                    <button
+                      onClick={() => {
+                        setActiveImageModal(doc);
+                        setImageZoom(1);
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                      title="Ver imagen"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                      <span>Ver</span>
+                    </button>
+                  ) : doc.file_url ? (
+                    <a
+                      href={doc.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                      title="Abrir enlace"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Abrir</span>
+                    </a>
+                  ) : null}
 
-              {/* Image Preview with Zoom icon */}
-              {doc.file_type === 'img' && doc.file_url && (
-                <div 
-                  onClick={() => {
-                    setActiveImageModal(doc);
-                    setImageZoom(1);
-                  }}
-                  className="mb-3 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 h-36 bg-slate-100 dark:bg-dark-950 relative cursor-pointer group/img"
-                  title="Haz clic para hacer zoom"
-                >
-                  <img src={doc.file_url} alt={doc.title} className="w-full h-full object-cover transition-transform group-hover/img:scale-105" />
-                  <div className="absolute inset-0 bg-dark-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white font-mono text-xs font-semibold backdrop-blur-xs">
-                    <Maximize2 className="w-4 h-4 text-brand-cyan" />
-                    <span>Ampliar / Zoom</span>
-                  </div>
+                  {/* Edit action (Any room member) */}
+                  <button
+                    onClick={() => handleOpenEditModal(doc)}
+                    className="p-1 rounded-lg text-slate-500 hover:text-cyan-600 dark:hover:text-brand-cyan hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Editar documento (Cualquier miembro)"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Delete action (ONLY Leader/Owner) */}
+                  {isOwner && (
+                    <button
+                      onClick={() => handleDeleteDoc(doc)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                      title="Eliminar documento (Exclusivo Líder)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
+          ))}
+        </div>
+      )}
 
-            {/* Bottom Actions & Author */}
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs">
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                @{doc.author_username || 'dev'}
-              </span>
-
-              {doc.file_type === 'md' ? (
-                <button
-                  onClick={() => setActiveDocModal(doc)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 dark:text-brand-cyan hover:underline"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Leer / Editar</span>
-                </button>
-              ) : doc.file_type === 'img' ? (
-                <button
-                  onClick={() => {
-                    setActiveImageModal(doc);
-                    setImageZoom(1);
-                  }}
-                  className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                  <span>Ver con Zoom</span>
-                </button>
-              ) : doc.file_url ? (
-                <a
-                  href={doc.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Abrir Archivo</span>
-                </a>
-              ) : null}
-            </div>
-          </div>
-        ))}
-
-        {filteredDocs.length === 0 && (
-          <div className="col-span-full p-12 text-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 font-mono">
-            No se encontraron documentos en esta carpeta. Usa el botón "Nuevo Documento" para registrar uno.
-          </div>
-        )}
-      </div>
-
-      {/* 4. Image Zoom Modal (Pan & Zoom capability) */}
+      {/* 4. Image Zoom Modal */}
       {activeImageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/85 backdrop-blur-md animate-fade-in">
           <div className="glass-panel w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900 overflow-hidden">
@@ -501,7 +593,7 @@ export default function ProjectDocuments({ projectId = 1 }) {
               </div>
             </div>
 
-            {/* Image viewport with scrollable zoom container */}
+            {/* Image viewport */}
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-100/50 dark:bg-dark-950/70">
               <img
                 src={activeImageModal.file_url}
@@ -514,7 +606,7 @@ export default function ProjectDocuments({ projectId = 1 }) {
         </div>
       )}
 
-      {/* 5. View/Edit Markdown Modal */}
+      {/* 5. View Markdown Modal */}
       {activeDocModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in">
           <div className="glass-panel w-full max-w-2xl max-h-[85vh] flex flex-col p-6 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900">
@@ -534,10 +626,22 @@ export default function ProjectDocuments({ projectId = 1 }) {
               {activeDocModal.content_markdown || 'Sin contenido de texto.'}
             </div>
 
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  const docToEdit = activeDocModal;
+                  setActiveDocModal(null);
+                  handleOpenEditModal(docToEdit);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500/10 text-cyan-600 dark:text-brand-cyan hover:bg-cyan-500/20"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Editar Contenido</span>
+              </button>
+
               <button
                 onClick={() => setActiveDocModal(null)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
               >
                 Cerrar
               </button>
@@ -546,21 +650,155 @@ export default function ProjectDocuments({ projectId = 1 }) {
         </div>
       )}
 
-      {/* 6. Add Document Modal */}
-      {isAddModalOpen && (
+      {/* 6. Edit Document Modal (Open to all members in the room) */}
+      {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="glass-panel w-full max-w-md p-6 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Plus className="w-5 h-5 text-brand-cyan" />
-                Registrar Documento en la Sala
-              </h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white">
+          <div className="glass-panel w-full max-w-lg p-6 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-brand-cyan" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Editar Documento
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateDoc} className="space-y-4">
+            <form onSubmit={handleUpdateDoc} className="space-y-4 pt-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">Título del Documento:</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan"
+                  placeholder="ej. Especificación Técnica"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">Carpeta:</label>
+                  <select
+                    value={editFolder}
+                    onChange={(e) => setEditFolder(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-mono"
+                  >
+                    <option value="Arquitectura">Arquitectura</option>
+                    <option value="Diseño & UX">Diseño & UX</option>
+                    <option value="Reuniones & Notas">Reuniones & Notas</option>
+                    <option value="Documentación General">Documentación General</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">Tipo de Archivo:</label>
+                  <select
+                    value={editType}
+                    onChange={(e) => setEditType(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-mono"
+                  >
+                    <option value="md">Markdown (.md)</option>
+                    <option value="pdf">Documento PDF (.pdf)</option>
+                    <option value="docx">Documento Word (.docx)</option>
+                    <option value="img">Imagen / Mockup (.png, .jpg)</option>
+                  </select>
+                </div>
+              </div>
+
+              {editType === 'md' ? (
+                <div>
+                  <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">Contenido Markdown:</label>
+                  <textarea
+                    rows="6"
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-mono resize-none"
+                    placeholder="# Notas y especificaciones..."
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-cyan-500/5 dark:bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <UploadCloud className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        Subir a Cloudinary:
+                      </span>
+                    </div>
+                    <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-800 text-brand-cyan border border-brand-cyan/40 text-[11px] font-mono hover:bg-slate-800 transition-all">
+                      <span>{uploadingCloudinary ? 'Subiendo...' : 'Examinar'}</span>
+                      <input
+                        type="file"
+                        disabled={uploadingCloudinary}
+                        onChange={(e) => handleCloudinaryDocUpload(e, true)}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">
+                      URL del archivo:
+                    </label>
+                    <input
+                      type="url"
+                      value={editUrl}
+                      onChange={(e) => setEditUrl(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan font-mono"
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-brand-cyan hover:bg-cyan-400 text-dark-950 shadow-md shadow-brand-cyan/20 disabled:opacity-50"
+                >
+                  {editSubmitting ? 'Guardando...' : 'Actualizar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7. New Document Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="glass-panel w-full max-w-lg p-6 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-2xl bg-white dark:bg-dark-900">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-brand-cyan" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Nuevo Documento de la Sala
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDoc} className="space-y-4 pt-4">
               <div>
                 <label className="block text-xs font-mono text-slate-700 dark:text-slate-300 mb-1">Título del Documento:</label>
                 <input
@@ -616,7 +854,6 @@ export default function ProjectDocuments({ projectId = 1 }) {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* Cloudinary direct upload option */}
                   <div className="p-3 rounded-xl bg-cyan-500/5 dark:bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <UploadCloud className="w-4 h-4 text-cyan-600 dark:text-brand-cyan" />
@@ -629,7 +866,7 @@ export default function ProjectDocuments({ projectId = 1 }) {
                       <input
                         type="file"
                         disabled={uploadingCloudinary}
-                        onChange={handleCloudinaryDocUpload}
+                        onChange={(e) => handleCloudinaryDocUpload(e, false)}
                         className="hidden"
                       />
                     </label>

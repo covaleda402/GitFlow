@@ -199,7 +199,7 @@ export default function CommitRollbackManager({ projectId = 1, project }) {
               <span className="text-[10px] font-mono font-bold text-cyan-600 dark:text-brand-cyan block">PASO 2</span>
               <strong className="block text-slate-900 dark:text-white">Ingesta de Telemetría</strong>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                El webhook o API vincula el commit al repositorio exacto (soporta multi-repo como en el trabajo de Jesús Ariel) y emite por WebSocket.
+                El webhook o API vincula el commit al repositorio exacto (soporta múltiples repositorios conectados, ej. Frontend y Backend) y emite por WebSocket.
               </p>
             </div>
 

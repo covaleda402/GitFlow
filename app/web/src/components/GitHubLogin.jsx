@@ -25,8 +25,15 @@ export default function GitHubLogin() {
     if (params.get('notice') === 'github_oauth_unconfigured') {
       setInfoNotice('Para OAuth directo se requiere GITHUB_CLIENT_ID en Vercel/.env. Puedes verificar tu usuario directamente abajo.');
     }
-    if (params.get('error')) {
-      setErrorNotice('Error en la autenticación con GitHub. Por favor verifica las credenciales e intenta nuevamente.');
+    const errParam = params.get('error');
+    if (errParam) {
+      if (errParam === 'missing_github_client_secret') {
+        setErrorNotice('Falta configurar la variable GITHUB_CLIENT_SECRET en las Environment Variables de Vercel.');
+      } else if (errParam === 'oauth_token_exchange_failed') {
+        setErrorNotice('Fallo en el intercambio de token con GitHub. Revisa que el Client Secret coincida con el de la App.');
+      } else {
+        setErrorNotice('Error en la autenticación con GitHub. Por favor verifica las credenciales e intenta nuevamente.');
+      }
     }
   }, [location]);
 
@@ -182,7 +189,7 @@ export default function GitHubLogin() {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Ej: covaleda402 o tu usuario"
+                  placeholder="Tu usuario de GitHub (ej. octocat)"
                   className="w-full px-3 py-2 text-xs rounded-xl bg-white dark:bg-dark-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-200 focus:outline-none focus:border-brand-cyan font-mono"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">

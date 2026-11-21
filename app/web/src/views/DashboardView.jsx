@@ -375,7 +375,7 @@ export default function DashboardView() {
                         {/* Top Status & ID Bar */}
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-dark-950 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
-                            Sala #{p.id}
+                            Sala
                           </span>
                           <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
                             isSuspended

@@ -20,14 +20,12 @@ router.get('/github', (req, res) => {
     return res.redirect(`${FRONTEND_URL}/login?notice=github_oauth_unconfigured`);
   }
 
-  const host = req.headers['x-forwarded-host'] || req.get('host');
-  let proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  if (host && (host.includes('vercel.app') || host.includes('git-flow') || !host.includes('localhost'))) {
-    proto = 'https';
-  } else if (FRONTEND_URL && FRONTEND_URL.startsWith('https://')) {
-    proto = 'https';
-  }
-  const redirectUri = `${proto}://${host}/api/auth/github/callback`;
+  const host = (req.headers['x-forwarded-host'] || req.get('host') || '').split(',')[0].trim();
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const baseUrl = isLocal 
+    ? `http://${host}` 
+    : (process.env.URL_FRONTEND || process.env.FRONTEND_URL || 'https://git-flow-nu.vercel.app').replace(/\/+$/, '');
+  const redirectUri = `${baseUrl}/api/auth/github/callback`;
   const scope = 'read:user user:email';
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
 
@@ -43,6 +41,11 @@ router.get('/github/callback', async (req, res) => {
 
   if (!code) {
     return res.redirect(`${FRONTEND_URL}/login?error=missing_code`);
+  }
+
+  if (!GITHUB_CLIENT_SECRET) {
+    console.error('[OAuth Error] GITHUB_CLIENT_SECRET is missing in environment variables');
+    return res.redirect(`${FRONTEND_URL}/login?error=missing_github_client_secret`);
   }
 
   try {

@@ -938,6 +938,116 @@ router.post('/projects/:id/documents', authenticateToken, async (req, res) => {
 });
 
 /**
+ * PUT /api/projects/:id/documents/:docId
+ * Edit a document (Allowed for any room member or leader)
+ */
+router.put('/projects/:id/documents/:docId', authenticateToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+    const docId = parseInt(req.params.docId, 10);
+    const access = await getRoomAccess(projectId, req.user);
+
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'No tienes permisos para editar documentos en esta sala.' });
+    }
+
+    const { title, folder_name, file_type, file_url, content_markdown } = req.body;
+
+    const updateQuery = `
+      UPDATE project_documents
+      SET title = COALESCE($1, title),
+          folder_name = COALESCE($2, folder_name),
+          file_type = COALESCE($3, file_type),
+          file_url = COALESCE($4, file_url),
+          content_markdown = COALESCE($5, content_markdown)
+      WHERE id = $6 AND project_id = $7
+      RETURNING *
+    `;
+    const updateRes = await db.query(updateQuery, [
+      title ? title.trim() : null,
+      folder_name ? folder_name.trim() : null,
+      file_type || null,
+      file_url !== undefined ? file_url.trim() : null,
+      content_markdown !== undefined ? content_markdown : null,
+      docId,
+      projectId
+    ]);
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Documento no encontrado en esta sala.' });
+    }
+
+    const updatedDoc = updateRes.rows[0];
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(`project_${projectId}`).emit('document_updated', updatedDoc);
+    }
+
+    res.json({
+      success: true,
+      message: 'Documento actualizado con éxito.',
+      document: updatedDoc
+    });
+  } catch (error) {
+    console.error('[API Edit Document Error]:', error.message);
+    res.status(500).json({ error: 'Error al actualizar documento.' });
+  }
+});
+
+/**
+ * DELETE /api/projects/:id/documents/:docId
+ * Delete a document (RESTRICTED ONLY TO ROOM LEADER / OWNER)
+ */
+router.delete('/projects/:id/documents/:docId', authenticateToken, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id, 10);
+    const docId = parseInt(req.params.docId, 10);
+    const access = await getRoomAccess(projectId, req.user);
+
+    if (access.notFound) {
+      return res.status(404).json({ error: 'Sala no encontrada.' });
+    }
+
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'No perteneces a esta sala.' });
+    }
+
+    // OWASP A01: Broken Access Control - Only the leader can delete room files
+    if (!access.isOwner) {
+      return res.status(403).json({
+        error: 'Permiso denegado: Solo el líder de la sala tiene autorización para eliminar documentos.'
+      });
+    }
+
+    const delRes = await db.query(
+      'DELETE FROM project_documents WHERE id = $1 AND project_id = $2 RETURNING *',
+      [docId, projectId]
+    );
+
+    if (delRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Documento no encontrado en esta sala.' });
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(`project_${projectId}`).emit('document_deleted', { docId, projectId });
+    }
+
+    res.json({
+      success: true,
+      message: 'Documento eliminado exitosamente por el líder de la sala.'
+    });
+  } catch (error) {
+    console.error('[API Delete Document Error]:', error.message);
+    res.status(500).json({ error: 'Error al eliminar documento.' });
+  }
+});
+
+/**
  * PUT /api/projects/:id/context
  * Update shared live markdown context
  */

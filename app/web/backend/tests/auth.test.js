@@ -7,17 +7,17 @@ const db = require('../db');
 test('Auth: JWT signing and verification', () => {
   const payload = {
     id: 4,
-    username: 'covaleda402',
-    name: 'Jose Esneider Covaleda',
-    email: 'covaleda402@omnicode.tech'
+    username: 'dev-qa',
+    name: 'Desarrollador QA',
+    email: 'qa@omnicode.tech'
   };
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
   assert.ok(token, 'Token should be generated');
 
   const decoded = jwt.verify(token, JWT_SECRET);
-  assert.strictEqual(decoded.username, 'covaleda402');
-  assert.strictEqual(decoded.name, 'Jose Esneider Covaleda');
+  assert.strictEqual(decoded.username, 'dev-qa');
+  assert.strictEqual(decoded.name, 'Desarrollador QA');
   assert.strictEqual(decoded.id, 4);
 });
 
@@ -28,10 +28,10 @@ test('Auth: Rejects invalid or tampered JWT', () => {
 });
 
 test('Auth: Seeded teammates exist in database / mock store', async () => {
-  const res = await db.query('SELECT id, username, name FROM users WHERE username = $1', ['covaleda402']);
-  assert.ok(res.rows.length > 0, 'covaleda402 user should be found');
-  assert.strictEqual(res.rows[0].username, 'covaleda402');
-  assert.ok(res.rows[0].name.includes('Covaleda'));
+  const res = await db.query('SELECT id, username, name FROM users WHERE username = $1', ['maria-dev']);
+  assert.ok(res.rows.length > 0, 'maria-dev user should be found');
+  assert.strictEqual(res.rows[0].username, 'maria-dev');
+  assert.ok(res.rows[0].name.includes('Maria'));
 });
 
 test('Auth: Edwin Esquivel user exists and has tech lead profile', async () => {
@@ -63,7 +63,7 @@ test('Auth Middleware: authenticateToken rejects missing token with 401', () => 
 
 test('Auth Middleware: authenticateToken accepts valid Bearer token and sets req.user', () => {
   const { authenticateToken } = require('../middleware/auth');
-  const validToken = jwt.sign({ id: 4, username: 'covaleda402' }, JWT_SECRET);
+  const validToken = jwt.sign({ id: 4, username: 'dev-qa' }, JWT_SECRET);
 
   let nextCalled = false;
   const req = { headers: { authorization: `Bearer ${validToken}` } };
@@ -72,7 +72,7 @@ test('Auth Middleware: authenticateToken accepts valid Bearer token and sets req
 
   authenticateToken(req, res, next);
   assert.strictEqual(nextCalled, true);
-  assert.strictEqual(req.user.username, 'covaleda402');
+  assert.strictEqual(req.user.username, 'dev-qa');
 });
 
 test('Auth Middleware: optionalToken proceeds with or without token', () => {
@@ -92,4 +92,20 @@ test('Auth Middleware: optionalToken proceeds with or without token', () => {
   optionalToken(req2, {}, () => { nextCalled2 = true; });
   assert.strictEqual(nextCalled2, true);
   assert.strictEqual(req2.user.username, 'edwin-esquivel');
+});
+
+test('Auth Mailer: sendSecurityWelcomeEmail validates recipient and queues security notice', async () => {
+  const { sendSecurityWelcomeEmail } = require('../utils/mailer');
+
+  // Test invalid email rejection
+  const invalidResult = await sendSecurityWelcomeEmail({ email: 'not-an-email', username: 'dev' });
+  assert.strictEqual(invalidResult.success, false);
+
+  // Test valid email formatting and queuing
+  const validResult = await sendSecurityWelcomeEmail({
+    email: 'developer@example.com',
+    username: 'octocat',
+    name: 'Octocat The Dev'
+  });
+  assert.strictEqual(validResult.success, true);
 });

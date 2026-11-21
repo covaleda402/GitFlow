@@ -140,7 +140,7 @@ export default function CreateRoomModal({ isOpen, onClose, onCreated }) {
             </div>
 
             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-              Si tu proyecto incluye varios repos (ej. Frontend y Backend como en el proyecto de Jesús Ariel), anéxalos aquí. Si solo agregas uno, se seleccionará automáticamente en todas las tareas.
+              Si tu proyecto incluye varios repositorios (ej. Frontend y Backend), anéxalos aquí. Si solo agregas uno, se seleccionará automáticamente en todas las tareas.
             </p>
 
             <div className="space-y-2 pt-1">

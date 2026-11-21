@@ -199,9 +199,6 @@ export default function Sidebar({ projectId = 1, onOpenCreateRoom, onOpenJoinRoo
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200/50 dark:bg-slate-800 text-slate-500 shrink-0">
-                    #{p.id}
-                  </span>
                 </button>
               );
             })}
